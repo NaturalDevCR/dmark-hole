@@ -36,7 +36,8 @@ RestrictNamespaces=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 LockPersonality=true
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# AF_NETLINK: Node enumerates network interfaces when binding 0.0.0.0.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 SystemCallArchitectures=native
 # Allow binding privileged ports (e.g. SMTP_PORT=25) as an unprivileged user.
 AmbientCapabilities=CAP_NET_BIND_SERVICE

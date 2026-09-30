@@ -123,7 +123,7 @@ Todas las variables son opcionales. Ver [`.env.example`](.env.example). En syste
 | `SECURE_COOKIES` | `false` | `true` si sirves por HTTPS |
 | `WEB_DIST` | incluido | Ruta de la interfaz compilada |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | vacío | Administrador inicial; si faltan, se usa la página de configuración inicial |
-| `SMTP_ENABLED` | `false` | Activa el receptor SMTP integrado (también desde la UI) |
+| `SMTP_ENABLED` | `false` | Valor inicial del receptor SMTP integrado; una vez guardada la configuración desde la UI, manda la UI |
 | `SMTP_ALLOWED_RECIPIENTS` | vacío | Destinatarios aceptados por el receptor SMTP, separados por comas (`dmarc@reports.example.com`, `@reports.example.com`). **Obligatorio**: sin lista, el receptor rechaza todo. Editable en la UI |
 | `SMTP_PORT` | `2525` | Puerto del receptor SMTP |
 | `SMTP_LISTEN_HOST` | `0.0.0.0` | Dirección de escucha SMTP |
