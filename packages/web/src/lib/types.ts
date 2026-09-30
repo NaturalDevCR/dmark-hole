@@ -289,6 +289,7 @@ export interface IngestStatus {
 }
 
 export interface Settings {
+  language: "en" | "es";
   autoCreateDomains: boolean;
   storeRawXml: boolean;
   retentionDays: number;

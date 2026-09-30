@@ -3,6 +3,7 @@ import { useIntervalFn } from "@vueuse/core";
 import { Cpu, FileText, Globe, Inbox, Radio, ScrollText, Upload } from "lucide-vue-next";
 import { storeToRefs } from "pinia";
 import { computed, ref, watch, type Component } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import ApiPanel from "@/components/ingest/ApiPanel.vue";
 import LogPanel from "@/components/ingest/LogPanel.vue";
@@ -19,6 +20,7 @@ import type { IngestStatus, Mailbox } from "@/lib/types";
 import { useLoader } from "@/lib/useLoader";
 import { useAuth } from "@/stores/auth";
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const { isAdmin } = storeToRefs(useAuth());
@@ -38,62 +40,62 @@ function refreshAll() {
 }
 
 const tabs = computed<{ id: string; label: string; icon: Component; count?: number | null }[]>(() => [
-  { id: "mailboxes", label: "Buzones IMAP", icon: Inbox, count: mailboxes.value?.length ?? null },
-  ...(isAdmin.value ? [{ id: "upload", label: "Subir archivos", icon: Upload }] : []),
-  { id: "smtp", label: "Receptor SMTP", icon: Radio },
-  { id: "api", label: "API / HTTP", icon: Globe },
-  { id: "log", label: "Registro", icon: ScrollText },
+  { id: "mailboxes", label: t("ingest.tabs.mailboxes"), icon: Inbox, count: mailboxes.value?.length ?? null },
+  ...(isAdmin.value ? [{ id: "upload", label: t("ingest.tabs.upload"), icon: Upload }] : []),
+  { id: "smtp", label: t("ingest.tabs.smtp"), icon: Radio },
+  { id: "api", label: t("ingest.tabs.api"), icon: Globe },
+  { id: "log", label: t("ingest.tabs.log"), icon: ScrollText },
 ]);
 const initial = String(route.query.tab ?? "");
-const tab = ref(tabs.value.some((t) => t.id === initial) ? initial : "mailboxes");
-watch(tab, (t) => router.replace({ query: { ...route.query, tab: t === "mailboxes" ? undefined : t } }));
+const tab = ref(tabs.value.some((x) => x.id === initial) ? initial : "mailboxes");
+watch(tab, (v) => router.replace({ query: { ...route.query, tab: v === "mailboxes" ? undefined : v } }));
 
 const activeMailboxes = computed(() => mailboxes.value?.filter((m) => m.enabled).length ?? 0);
 const mailboxErrors = computed(() => mailboxes.value?.filter((m) => m.lastStatus === "error").length ?? 0);
 </script>
 
 <template>
-  <PageHeader title="Ingesta de reportes" subtitle="Reciba reportes DMARC por buzón IMAP, SMTP directo, HTTP o carga manual" />
+  <PageHeader :title="t('ingest.title')" :subtitle="t('ingest.subtitle')" />
 
   <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
     <template v-if="status">
       <div class="card p-4">
         <div class="flex items-center justify-between gap-2">
-          <p class="text-xs font-medium text-muted">Reportes recibidos</p>
+          <p class="text-xs font-medium text-muted">{{ t("ingest.cards.reportsReceived") }}</p>
           <span class="grid size-7 place-items-center rounded-lg bg-brand-soft text-brand"><FileText class="size-3.5" /></span>
         </div>
         <p class="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums">{{ num(status.counts.reports) }}</p>
-        <p class="mt-1 truncate text-xs text-muted">{{ num(status.counts.forensic) }} forenses · último {{ ago(status.counts.last) }}</p>
+        <p class="mt-1 truncate text-xs text-muted">{{ t("ingest.cards.reportsSub", { forensic: num(status.counts.forensic), last: ago(status.counts.last) }) }}</p>
       </div>
 
       <div class="card p-4">
         <div class="flex items-center justify-between gap-2">
-          <p class="text-xs font-medium text-muted">Receptor SMTP</p>
-          <Badge :tone="status.smtp.running ? 'pass' : 'neutral'" dot>{{ status.smtp.running ? "Activo" : "Detenido" }}</Badge>
+          <p class="text-xs font-medium text-muted">{{ t("ingest.cards.smtpReceiver") }}</p>
+          <Badge :tone="status.smtp.running ? 'pass' : 'neutral'" dot>{{ status.smtp.running ? t("ingest.cards.smtpActive") : t("ingest.cards.smtpStopped") }}</Badge>
         </div>
         <p class="mono mt-2 text-lg font-semibold">:{{ status.smtp.port }}</p>
         <p v-if="status.smtp.lastError" class="mt-1 truncate text-xs text-fail" :title="status.smtp.lastError">{{ status.smtp.lastError }}</p>
-        <p v-else class="mt-1 truncate text-xs text-muted">{{ num(status.smtp.received) }} mensajes recibidos{{ status.smtp.tls ? " · TLS" : "" }}</p>
+        <p v-else class="mt-1 truncate text-xs text-muted">{{ t(status.smtp.tls ? "ingest.cards.messagesReceivedTls" : "ingest.cards.messagesReceived", { count: num(status.smtp.received) }, status.smtp.received) }}</p>
       </div>
 
       <div class="card p-4">
         <div class="flex items-center justify-between gap-2">
-          <p class="text-xs font-medium text-muted">Cola de enriquecimiento</p>
+          <p class="text-xs font-medium text-muted">{{ t("ingest.cards.enrichmentQueue") }}</p>
           <span class="grid size-7 place-items-center rounded-lg bg-forwarded-soft text-forwarded"><Cpu class="size-3.5" /></span>
         </div>
         <p class="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums">{{ num(status.enrichment.pending) }}</p>
-        <p class="mt-1 truncate text-xs text-muted">pendientes · {{ num(status.enrichment.active) }} en proceso</p>
+        <p class="mt-1 truncate text-xs text-muted">{{ t("ingest.cards.enrichmentSub", { active: num(status.enrichment.active) }) }}</p>
       </div>
     </template>
     <template v-else><Skeleton v-for="i in 3" :key="i" class="h-[104px]" /></template>
 
     <div v-if="mailboxes" class="card p-4">
       <div class="flex items-center justify-between gap-2">
-        <p class="text-xs font-medium text-muted">Buzones IMAP</p>
+        <p class="text-xs font-medium text-muted">{{ t("ingest.cards.mailboxes") }}</p>
         <span class="grid size-7 place-items-center rounded-lg bg-brand-soft text-brand"><Inbox class="size-3.5" /></span>
       </div>
       <p class="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums">{{ num(mailboxes.length) }}</p>
-      <p class="mt-1 truncate text-xs" :class="mailboxErrors ? 'text-fail' : 'text-muted'">{{ num(activeMailboxes) }} activos{{ mailboxErrors ? ` · ${mailboxErrors} con error` : "" }}</p>
+      <p class="mt-1 truncate text-xs" :class="mailboxErrors ? 'text-fail' : 'text-muted'">{{ mailboxErrors ? t("ingest.cards.mailboxesActiveErrors", { active: num(activeMailboxes), errors: num(mailboxErrors) }) : t("ingest.cards.mailboxesActive", { count: num(activeMailboxes) }, activeMailboxes) }}</p>
     </div>
     <Skeleton v-else class="h-[104px]" />
   </div>

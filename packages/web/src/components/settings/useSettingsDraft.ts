@@ -1,4 +1,5 @@
 import { computed, onMounted, ref, type Ref } from "vue";
+import { t } from "@/i18n";
 import { api, withToast } from "@/lib/api";
 import type { Settings } from "@/lib/types";
 
@@ -7,7 +8,7 @@ import type { Settings } from "@/lib/types";
  * `pick` extracts the editable slice, `toPatch` turns the draft into a deep-partial
  * patch for PUT /settings. `dirty` compares the draft with the last saved slice.
  */
-export function useSettingsDraft<T>(pick: (s: Settings) => T, toPatch: (draft: T) => Record<string, unknown>, successMessage = "Configuración guardada", opts: { immediate?: boolean } = {}) {
+export function useSettingsDraft<T>(pick: (s: Settings) => T, toPatch: (draft: T) => Record<string, unknown>, successMessage: string | (() => string) = () => t("settings.saved"), opts: { immediate?: boolean } = {}) {
   const current = ref<Settings | null>(null) as Ref<Settings | null>;
   const draft = ref<T | null>(null) as Ref<T | null>;
   const snapshot = ref("");
@@ -39,7 +40,7 @@ export function useSettingsDraft<T>(pick: (s: Settings) => T, toPatch: (draft: T
     saving.value = true;
     try {
       const patch = toPatch(draft.value);
-      const r = await withToast(() => api.put<Settings>("/settings", patch), successMessage);
+      const r = await withToast(() => api.put<Settings>("/settings", patch), typeof successMessage === "function" ? successMessage() : successMessage);
       if (r) apply(r);
       return !!r;
     } finally {

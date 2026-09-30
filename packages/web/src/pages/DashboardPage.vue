@@ -2,6 +2,7 @@
 import { Activity, AlertOctagon, Inbox, MailCheck, Network, Plus } from "lucide-vue-next";
 import { storeToRefs } from "pinia";
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import BarList from "@/components/charts/BarList.vue";
 import ComplianceChart from "@/components/charts/ComplianceChart.vue";
@@ -26,6 +27,7 @@ import type { Category, DomainSummary, Overview, Provider, Reporter, Source, Tim
 import { useLoader } from "@/lib/useLoader";
 import { useFilters } from "@/stores/filters";
 
+const { t } = useI18n();
 const router = useRouter();
 const { query, days } = storeToRefs(useFilters());
 
@@ -68,14 +70,14 @@ const sortedDomains = computed(() => [...(data.value?.domains ?? [])].sort((a, b
 </script>
 
 <template>
-  <PageHeader title="Panel" :subtitle="`Autenticación de correo de todos sus dominios · últimos ${days} días`">
+  <PageHeader :title="$t('common.nav.dashboard')" :subtitle="$t('dashboard.subtitle', { days })">
     <RangePicker />
   </PageHeader>
 
-  <Empty v-if="empty" :icon="Inbox" title="Aún no hay dominios" description="Agregue un dominio y configure un buzón IMAP o el receptor SMTP para empezar a recibir reportes DMARC.">
+  <Empty v-if="empty" :icon="Inbox" :title="$t('dashboard.empty.title')" :description="$t('dashboard.empty.description')">
     <div class="flex gap-2">
-      <RouterLink to="/domains" class="btn-primary"><Plus class="size-4" />Agregar dominio</RouterLink>
-      <RouterLink to="/ingest" class="btn-secondary">Configurar ingesta</RouterLink>
+      <RouterLink to="/domains" class="btn-primary"><Plus class="size-4" />{{ $t("dashboard.empty.addDomain") }}</RouterLink>
+      <RouterLink to="/ingest" class="btn-secondary">{{ $t("dashboard.empty.setupIngest") }}</RouterLink>
     </div>
   </Empty>
 
@@ -83,25 +85,25 @@ const sortedDomains = computed(() => [...(data.value?.domains ?? [])].sort((a, b
     <!-- KPIs -->
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <template v-if="ov">
-        <Stat label="Mensajes analizados" :value="short(ov.messages)" :icon="Activity" :delta="change(ov.messages, ov.previous.messages)" hint="vs. periodo anterior" />
+        <Stat :label="$t('dashboard.kpi.messages')" :value="short(ov.messages)" :icon="Activity" :delta="change(ov.messages, ov.previous.messages)" :hint="$t('dashboard.kpi.vsPrevious')" />
         <Stat
-          label="Cumplimiento DMARC"
+          :label="$t('dashboard.kpi.compliance')"
           :value="pct(ov.compliance)"
           :icon="MailCheck"
           tone="pass"
           :delta="complianceDelta"
           delta-suffix=" pp"
-          :hint="`SPF ${pct(ov.spfAlignedRate)} · DKIM ${pct(ov.dkimAlignedRate)} alineados`"
+          :hint="$t('dashboard.kpi.alignedHint', { spf: pct(ov.spfAlignedRate), dkim: pct(ov.dkimAlignedRate) })"
         />
-        <Stat label="Fuentes de envío" :value="num(ov.sources)" :icon="Network" tone="forwarded" neutral :delta="change(ov.sources, ov.previous.sources)" :hint="`${num(ov.reports)} reportes`" />
+        <Stat :label="$t('dashboard.kpi.sources')" :value="num(ov.sources)" :icon="Network" tone="forwarded" neutral :delta="change(ov.sources, ov.previous.sources)" :hint="$t('dashboard.kpi.reportsHint', { n: num(ov.reports) }, ov.reports)" />
         <Stat
-          label="No autenticados"
+          :label="$t('dashboard.kpi.unauthenticated')"
           :value="short(ov.categories.fail)"
           :icon="AlertOctagon"
           tone="fail"
           invert
           :delta="change(ov.categories.fail, ov.previous.categories.fail)"
-          :hint="`${num(ov.disposition.reject)} rechazados · ${num(ov.disposition.quarantine)} en cuarentena`"
+          :hint="$t('dashboard.kpi.dispositionHint', { reject: num(ov.disposition.reject), quarantine: num(ov.disposition.quarantine) })"
         />
       </template>
       <template v-else>
@@ -110,19 +112,19 @@ const sortedDomains = computed(() => [...(data.value?.domains ?? [])].sort((a, b
     </div>
 
     <div v-if="noData" class="card mt-6 border-dashed">
-      <Empty title="Sin reportes en este periodo" description="Los proveedores envían reportes agregados una vez al día. Revise la sección Ingesta o amplíe el rango de fechas." />
+      <Empty :title="$t('dashboard.noData.title')" :description="$t('dashboard.noData.description')" />
     </div>
 
     <template v-else>
       <!-- Volume + composition -->
       <div class="mt-6 grid gap-6 xl:grid-cols-3">
-        <Card title="Volumen por resultado" subtitle="Mensajes diarios según la clasificación DMARC" class="xl:col-span-2">
+        <Card :title="$t('dashboard.volume.title')" :subtitle="$t('dashboard.volume.subtitle')" class="xl:col-span-2">
           <VolumeChart v-if="data" :data="data.ts" />
           <Skeleton v-else class="h-[280px]" />
         </Card>
-        <Card title="Composición del tráfico">
+        <Card :title="$t('dashboard.composition.title')">
           <div v-if="ov" class="flex flex-col items-center gap-5">
-            <Donut :items="donutItems" :center="pct(ov.compliance)" center-label="pasa DMARC" />
+            <Donut :items="donutItems" :center="pct(ov.compliance)" :center-label="$t('dashboard.composition.centerLabel')" />
             <ul class="w-full space-y-2.5">
               <li v-for="d in donut" :key="d.key" class="flex items-start gap-3">
                 <span class="mt-1 size-2.5 shrink-0 rounded-sm" :style="{ background: d.color }" />
@@ -141,19 +143,19 @@ const sortedDomains = computed(() => [...(data.value?.domains ?? [])].sort((a, b
       </div>
 
       <!-- Domains -->
-      <Card title="Salud por dominio" subtitle="Puntuación combinada de cumplimiento y configuración DNS" class="mt-6" flush>
-        <template #actions><RouterLink to="/domains" class="btn-ghost btn-sm">Ver todos</RouterLink></template>
+      <Card :title="$t('dashboard.health.title')" :subtitle="$t('dashboard.health.subtitle')" class="mt-6" flush>
+        <template #actions><RouterLink to="/domains" class="btn-ghost btn-sm">{{ $t("common.actions.viewAll") }}</RouterLink></template>
         <div class="overflow-x-auto">
           <table class="table">
             <thead>
               <tr>
-                <th>Dominio</th>
-                <th>Salud</th>
-                <th>Política</th>
-                <th class="text-right">Mensajes</th>
-                <th class="w-56">Clasificación</th>
-                <th>Cumplimiento</th>
-                <th>Último reporte</th>
+                <th>{{ $t("dashboard.health.cols.domain") }}</th>
+                <th>{{ $t("dashboard.health.cols.health") }}</th>
+                <th>{{ $t("dashboard.health.cols.policy") }}</th>
+                <th class="text-right">{{ $t("dashboard.health.cols.messages") }}</th>
+                <th class="w-56">{{ $t("dashboard.health.cols.classification") }}</th>
+                <th>{{ $t("dashboard.health.cols.compliance") }}</th>
+                <th>{{ $t("dashboard.health.cols.lastReport") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -182,27 +184,27 @@ const sortedDomains = computed(() => [...(data.value?.domains ?? [])].sort((a, b
       </Card>
 
       <div class="mt-6 grid gap-6 xl:grid-cols-3">
-        <Card title="Tendencia de cumplimiento" subtitle="% de mensajes que pasan DMARC por día" class="xl:col-span-2">
+        <Card :title="$t('dashboard.trend.title')" :subtitle="$t('dashboard.trend.subtitle')" class="xl:col-span-2">
           <ComplianceChart v-if="data" :days="data.ts.days" :values="data.ts.series.compliance" />
         </Card>
-        <Card title="Proveedores que reportan" subtitle="Organizaciones que envían reportes agregados">
+        <Card :title="$t('dashboard.reporters.title')" :subtitle="$t('dashboard.reporters.subtitle')">
           <BarList
             v-if="data"
-            :items="data.reporters.slice(0, 7).map((r) => ({ key: r.name, label: r.name, value: r.messages, sub: `${num(r.reports)} rep.` }))"
+            :items="data.reporters.slice(0, 7).map((r) => ({ key: r.name, label: r.name, value: r.messages, sub: t('dashboard.reporters.reports', { n: num(r.reports) }, r.reports) }))"
             :value-label="short"
           />
         </Card>
       </div>
 
       <div class="mt-6 grid gap-6 xl:grid-cols-2">
-        <Card title="Principales servicios de envío" subtitle="Agrupados por proveedor detectado (PTR / ASN)">
-          <template #actions><RouterLink to="/sources" class="btn-ghost btn-sm">Explorar fuentes</RouterLink></template>
+        <Card :title="$t('dashboard.providers.title')" :subtitle="$t('dashboard.providers.subtitle')">
+          <template #actions><RouterLink to="/sources" class="btn-ghost btn-sm">{{ $t("dashboard.providers.explore") }}</RouterLink></template>
           <ul v-if="data" class="space-y-3">
             <li v-for="p in data.providers.slice(0, 7)" :key="p.name">
               <div class="mb-1.5 flex items-center justify-between gap-3 text-sm">
                 <span class="flex min-w-0 items-center gap-2">
                   <span class="truncate font-medium">{{ p.name }}</span>
-                  <span class="text-xs text-faint">{{ p.ips }} IP</span>
+                  <span class="text-xs text-faint">{{ $t("dashboard.providers.ips", { n: p.ips }, p.ips) }}</span>
                 </span>
                 <span class="flex shrink-0 items-center gap-3">
                   <SourceStatusBadge :status="p.status" />
@@ -213,12 +215,12 @@ const sortedDomains = computed(() => [...(data.value?.domains ?? [])].sort((a, b
             </li>
           </ul>
         </Card>
-        <Card title="Fuentes sospechosas" subtitle="IPs cuyo correo falla SPF y DKIM" flush>
-          <template #actions><RouterLink to="/sources?status=suspicious" class="btn-ghost btn-sm">Ver todas</RouterLink></template>
-          <Empty v-if="data && !data.sources.length" title="Sin fuentes sospechosas" description="Ninguna IP envió correo no autenticado en este periodo." />
+        <Card :title="$t('dashboard.suspicious.title')" :subtitle="$t('dashboard.suspicious.subtitle')" flush>
+          <template #actions><RouterLink to="/sources?status=suspicious" class="btn-ghost btn-sm">{{ $t("dashboard.suspicious.viewAll") }}</RouterLink></template>
+          <Empty v-if="data && !data.sources.length" :title="$t('dashboard.suspicious.emptyTitle')" :description="$t('dashboard.suspicious.emptyDescription')" />
           <table v-else class="table">
             <thead>
-              <tr><th>Origen</th><th>Dominios</th><th class="text-right">Fallidos</th></tr>
+              <tr><th>{{ $t("dashboard.suspicious.cols.origin") }}</th><th>{{ $t("dashboard.suspicious.cols.domains") }}</th><th class="text-right">{{ $t("dashboard.suspicious.cols.failed") }}</th></tr>
             </thead>
             <tbody>
               <tr v-for="s in data?.sources ?? []" :key="s.ip" class="row-link" @click="router.push(`/sources/${encodeURIComponent(s.ip)}`)">

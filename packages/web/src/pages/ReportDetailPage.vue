@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Activity, ArrowLeft, Download, Layers, MailCheck, Network, Trash2, TriangleAlert } from "lucide-vue-next";
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import StackBar from "@/components/charts/StackBar.vue";
 import AuthPill from "@/components/dmarc/AuthPill.vue";
@@ -22,6 +23,7 @@ import { useLoader } from "@/lib/useLoader";
 import { useAuth } from "@/stores/auth";
 
 const props = defineProps<{ id: string }>();
+const { t } = useI18n();
 const router = useRouter();
 const auth = useAuth();
 
@@ -29,7 +31,7 @@ const { data: r, error } = useLoader(() => api.get<ReportDetail>(`/reports/${pro
 
 const confirmDelete = ref(false);
 async function remove() {
-  const ok = await withToast(() => api.del(`/reports/${props.id}`), "Reporte eliminado");
+  const ok = await withToast(() => api.del(`/reports/${props.id}`), t("reports.detail.deleted"));
   confirmDelete.value = false;
   if (ok !== undefined) router.push("/reports");
 }
@@ -75,16 +77,16 @@ const period = computed(() => {
 
 <template>
   <div v-if="error" class="card">
-    <Empty title="No se pudo cargar el reporte" :description="error">
-      <RouterLink to="/reports" class="btn-secondary"><ArrowLeft class="size-4" />Volver a reportes</RouterLink>
+    <Empty :title="$t('reports.detail.loadError')" :description="error">
+      <RouterLink to="/reports" class="btn-secondary"><ArrowLeft class="size-4" />{{ $t("reports.detail.backToReports") }}</RouterLink>
     </Empty>
   </div>
 
   <template v-else>
-    <PageHeader :title="r?.orgName ?? 'Reporte'" :subtitle="r ? `Reporte agregado · ${period}` : undefined">
+    <PageHeader :title="r?.orgName ?? $t('reports.detail.fallbackTitle')" :subtitle="r ? $t('reports.detail.subtitle', { period }) : undefined">
       <template #eyebrow>
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <RouterLink to="/reports" class="inline-flex items-center gap-1 hover:text-fg"><ArrowLeft class="size-3.5" />Reportes</RouterLink>
+          <RouterLink to="/reports" class="inline-flex items-center gap-1 hover:text-fg"><ArrowLeft class="size-3.5" />{{ $t("common.nav.reports") }}</RouterLink>
           <template v-if="r">
             <span class="text-faint">/</span>
             <RouterLink :to="`/domains/${r.domainId}`" class="font-medium text-fg hover:text-brand hover:underline">{{ r.domain }}</RouterLink>
@@ -92,8 +94,8 @@ const period = computed(() => {
         </div>
       </template>
       <template v-if="r">
-        <a v-if="r.hasXml" :href="api.url(`/reports/${r.id}/xml`)" class="btn-secondary" download><Download class="size-4" />Descargar XML</a>
-        <button v-if="auth.isAdmin" class="btn-danger" @click="confirmDelete = true"><Trash2 class="size-4" />Eliminar</button>
+        <a v-if="r.hasXml" :href="api.url(`/reports/${r.id}/xml`)" class="btn-secondary" download><Download class="size-4" />{{ $t("reports.detail.downloadXml") }}</a>
+        <button v-if="auth.isAdmin" class="btn-danger" @click="confirmDelete = true"><Trash2 class="size-4" />{{ $t("common.actions.delete") }}</button>
       </template>
     </PageHeader>
 
@@ -106,55 +108,55 @@ const period = computed(() => {
     <template v-else>
       <!-- KPIs -->
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Mensajes" :value="num(r.messages)" :icon="Activity" :hint="`${num(r.pass)} pasan DMARC`" />
-        <Stat label="Pasa DMARC" :value="pct(ratio(r.pass, r.messages))" :icon="MailCheck" tone="pass" :hint="`${num(r.messages - r.pass)} no pasan`" />
-        <Stat label="Fuentes" :value="num(r.recordCount)" :icon="Network" tone="forwarded" hint="registros en el reporte" />
+        <Stat :label="$t('reports.detail.stats.messages')" :value="num(r.messages)" :icon="Activity" :hint="$t('reports.detail.stats.messagesHint', { count: num(r.pass) })" />
+        <Stat :label="$t('reports.detail.stats.passes')" :value="pct(ratio(r.pass, r.messages))" :icon="MailCheck" tone="pass" :hint="$t('reports.detail.stats.passesHint', { count: num(r.messages - r.pass) })" />
+        <Stat :label="$t('reports.detail.stats.sources')" :value="num(r.recordCount)" :icon="Network" tone="forwarded" :hint="$t('reports.detail.stats.sourcesHint')" />
         <Stat
-          label="Disposiciones"
+          :label="$t('reports.detail.stats.dispositions')"
           :value="`${num(dispositions.none ?? 0)} / ${num(dispositions.quarantine ?? 0)} / ${num(dispositions.reject ?? 0)}`"
           :icon="Layers"
           tone="misaligned"
-          hint="ninguna / cuarentena / rechazo"
+          :hint="$t('reports.detail.stats.dispositionsHint')"
         />
       </div>
 
       <div class="mt-6 grid gap-6 xl:grid-cols-3">
         <!-- Metadata -->
-        <Card title="Detalles del reporte" class="xl:col-span-2">
+        <Card :title="$t('reports.detail.meta.title')" class="xl:col-span-2">
           <dl class="grid gap-x-6 gap-y-4 sm:grid-cols-2">
             <div class="min-w-0 sm:col-span-2">
-              <dt class="text-xs font-medium text-muted">ID del reporte</dt>
+              <dt class="text-xs font-medium text-muted">{{ $t("reports.detail.meta.reportId") }}</dt>
               <dd class="mt-0.5 flex items-center gap-1"><span class="mono truncate">{{ r.reportId }}</span><CopyButton :text="r.reportId" /></dd>
             </div>
             <div>
-              <dt class="text-xs font-medium text-muted">Periodo</dt>
+              <dt class="text-xs font-medium text-muted">{{ $t("reports.detail.meta.period") }}</dt>
               <dd class="mt-0.5 text-sm">{{ period }}</dd>
             </div>
             <div>
-              <dt class="text-xs font-medium text-muted">Recibido</dt>
+              <dt class="text-xs font-medium text-muted">{{ $t("reports.detail.meta.received") }}</dt>
               <dd class="mt-0.5 text-sm">{{ date(r.receivedAt, true) }}</dd>
             </div>
             <div>
-              <dt class="text-xs font-medium text-muted">Fuente</dt>
+              <dt class="text-xs font-medium text-muted">{{ $t("reports.detail.meta.source") }}</dt>
               <dd class="mt-0.5 text-sm break-all">{{ sourceLabel(r.source) }}</dd>
             </div>
             <div class="min-w-0">
-              <dt class="text-xs font-medium text-muted">Contacto</dt>
+              <dt class="text-xs font-medium text-muted">{{ $t("reports.detail.meta.contact") }}</dt>
               <dd class="mt-0.5 text-sm break-words">
                 {{ r.orgEmail ?? "—" }}
                 <span v-if="r.extraContact" class="block text-xs text-muted">{{ r.extraContact }}</span>
               </dd>
             </div>
             <div v-if="r.policyDomain !== r.domain">
-              <dt class="text-xs font-medium text-muted">Dominio de la política</dt>
+              <dt class="text-xs font-medium text-muted">{{ $t("reports.detail.meta.policyDomain") }}</dt>
               <dd class="mt-0.5 text-sm">{{ r.policyDomain }}</dd>
             </div>
             <div v-if="r.version">
-              <dt class="text-xs font-medium text-muted">Versión del formato</dt>
+              <dt class="text-xs font-medium text-muted">{{ $t("reports.detail.meta.version") }}</dt>
               <dd class="mt-0.5 text-sm">{{ r.version }}</dd>
             </div>
             <div class="sm:col-span-2">
-              <dt class="text-xs font-medium text-muted">Política publicada</dt>
+              <dt class="text-xs font-medium text-muted">{{ $t("reports.detail.meta.publishedPolicy") }}</dt>
               <dd class="mt-1.5 flex flex-wrap items-center gap-2">
                 <PolicyBadge :policy="r.p" :pct="r.pct" />
                 <span v-for="c in policyChips" :key="c.k" class="inline-flex items-center overflow-hidden rounded-md text-xs ring-1 ring-line-strong/60 ring-inset">
@@ -167,7 +169,7 @@ const period = computed(() => {
         </Card>
 
         <!-- Composition -->
-        <Card title="Clasificación de mensajes" subtitle="Según los registros de este reporte">
+        <Card :title="$t('reports.detail.composition.title')" :subtitle="$t('reports.detail.composition.subtitle')">
           <StackBar :pass="categories.pass" :forwarded="categories.forwarded" :misaligned="categories.misaligned" :fail="categories.fail" :height="12" />
           <ul class="mt-4 space-y-2.5">
             <li v-for="c in (['pass', 'forwarded', 'misaligned', 'fail'] as Category[])" :key="c" class="flex items-center gap-3 text-sm">
@@ -182,26 +184,26 @@ const period = computed(() => {
 
       <!-- Report errors -->
       <div v-if="r.errors.length" class="mt-6 rounded-xl border border-misaligned/30 bg-misaligned-soft p-4">
-        <p class="flex items-center gap-2 text-sm font-semibold text-misaligned"><TriangleAlert class="size-4" />El reportador indicó {{ r.errors.length }} {{ r.errors.length === 1 ? "error" : "errores" }}</p>
+        <p class="flex items-center gap-2 text-sm font-semibold text-misaligned"><TriangleAlert class="size-4" />{{ $t("reports.detail.errors", { count: r.errors.length }, r.errors.length) }}</p>
         <ul class="mt-2 list-inside list-disc space-y-1 text-sm text-fg">
           <li v-for="(e, i) in r.errors" :key="i" class="break-words">{{ e }}</li>
         </ul>
       </div>
 
       <!-- Records -->
-      <Card title="Registros" :subtitle="`${num(r.records.length)} origen(es) de envío, ordenados por volumen`" class="mt-6" flush>
-        <Empty v-if="!r.records.length" title="Este reporte no contiene registros" />
+      <Card :title="$t('reports.detail.records.title')" :subtitle="$t('reports.detail.records.subtitle', { count: num(r.records.length) }, r.records.length)" class="mt-6" flush>
+        <Empty v-if="!r.records.length" :title="$t('reports.detail.records.empty')" />
         <div v-else class="overflow-x-auto">
           <table class="table">
             <thead>
               <tr>
-                <th>Origen</th>
-                <th class="text-right">Mensajes</th>
-                <th>Resultado</th>
-                <th>Disposición</th>
-                <th>Evaluación DMARC</th>
-                <th>Autenticación</th>
-                <th>Identificadores</th>
+                <th>{{ $t("reports.detail.records.origin") }}</th>
+                <th class="text-right">{{ $t("reports.detail.records.messages") }}</th>
+                <th>{{ $t("reports.detail.records.result") }}</th>
+                <th>{{ $t("reports.detail.records.disposition") }}</th>
+                <th>{{ $t("reports.detail.records.dmarcEval") }}</th>
+                <th>{{ $t("reports.detail.records.authentication") }}</th>
+                <th>{{ $t("reports.detail.records.identifiers") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -225,15 +227,15 @@ const period = computed(() => {
                   <div class="flex flex-col items-start gap-1">
                     <AuthPill v-for="(d, i) in rec.dkim" :key="`d${i}`" kind="DKIM" :result="d.result" :aligned="d.aligned" :domain="d.domain" :selector="d.selector" />
                     <AuthPill v-for="(s, i) in rec.spf" :key="`s${i}`" kind="SPF" :result="s.result" :aligned="s.aligned" :domain="s.domain" />
-                    <span v-if="!rec.dkim.length && !rec.spf.length" class="text-xs text-muted">Sin datos de autenticación</span>
+                    <span v-if="!rec.dkim.length && !rec.spf.length" class="text-xs text-muted">{{ $t("reports.detail.records.noAuthData") }}</span>
                   </div>
                   <p v-for="(d, i) in rec.dkim.filter((x) => x.selector)" :key="`sel${i}`" class="mono mt-1 text-[11px] text-muted">s={{ d.selector }}</p>
                 </td>
                 <td class="max-w-64 !align-top text-xs">
                   <dl class="space-y-0.5">
                     <div class="flex gap-1.5"><dt class="w-9 shrink-0 text-muted">From</dt><dd class="truncate" :title="rec.headerFrom">{{ rec.headerFrom }}</dd></div>
-                    <div v-if="rec.envelopeFrom" class="flex gap-1.5"><dt class="w-9 shrink-0 text-muted">Env.</dt><dd class="truncate" :title="rec.envelopeFrom">{{ rec.envelopeFrom }}</dd></div>
-                    <div v-if="rec.envelopeTo" class="flex gap-1.5"><dt class="w-9 shrink-0 text-muted">Para</dt><dd class="truncate" :title="rec.envelopeTo">{{ rec.envelopeTo }}</dd></div>
+                    <div v-if="rec.envelopeFrom" class="flex gap-1.5"><dt class="w-9 shrink-0 text-muted">{{ $t("reports.detail.records.envelopeFrom") }}</dt><dd class="truncate" :title="rec.envelopeFrom">{{ rec.envelopeFrom }}</dd></div>
+                    <div v-if="rec.envelopeTo" class="flex gap-1.5"><dt class="w-9 shrink-0 text-muted">{{ $t("reports.detail.records.envelopeTo") }}</dt><dd class="truncate" :title="rec.envelopeTo">{{ rec.envelopeTo }}</dd></div>
                   </dl>
                 </td>
               </tr>
@@ -246,9 +248,9 @@ const period = computed(() => {
 
   <Confirm
     v-if="confirmDelete"
-    title="Eliminar reporte"
-    message="Se eliminará este reporte y todos sus registros. Las estadísticas de los periodos que cubre se recalcularán sin él. Esta acción no se puede deshacer."
-    confirm-label="Eliminar"
+    :title="$t('reports.detail.delete.title')"
+    :message="$t('reports.detail.delete.message')"
+    :confirm-label="$t('common.actions.delete')"
     danger
     @confirm="remove"
     @close="confirmDelete = false"

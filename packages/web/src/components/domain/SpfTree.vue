@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import type { SpfNode } from "@/lib/types";
 defineOptions({ name: "SpfTree" });
 defineProps<{ node: SpfNode; depth?: number }>();
+const { t } = useI18n();
 const qual: Record<string, string> = { "+": "", "-": "-", "~": "~", "?": "?" };
 </script>
 
@@ -9,7 +11,7 @@ const qual: Record<string, string> = { "+": "", "-": "-", "~": "~", "?": "?" };
   <div :class="(depth ?? 0) > 0 && 'ml-4 border-l border-line pl-3'">
     <div class="flex items-center gap-2 py-1 text-sm">
       <span class="mono font-medium">{{ node.domain }}</span>
-      <span v-if="node.lookups" class="rounded bg-subtle px-1.5 text-[11px] text-muted">{{ node.lookups }} consulta{{ node.lookups > 1 ? "s" : "" }}</span>
+      <span v-if="node.lookups" class="rounded bg-subtle px-1.5 text-[11px] text-muted">{{ t("dns.spf.lookupCount", { n: node.lookups }, node.lookups) }}</span>
       <span v-if="node.error" class="text-xs text-fail">{{ node.error }}</span>
     </div>
     <div v-if="node.mechanisms.length" class="mb-1 flex flex-wrap gap-1">

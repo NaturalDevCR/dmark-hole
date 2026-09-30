@@ -1,24 +1,28 @@
-import type { Tone } from "@/lib/format";
+import { i18n, t } from "@/i18n";
+import { num, type Tone } from "@/lib/format";
 
 export type LogStatus = "ok" | "duplicate" | "error" | "ignored";
 
-export const LOG_STATUS: Record<LogStatus, { label: string; tone: Tone }> = {
-  ok: { label: "Correcto", tone: "pass" },
-  duplicate: { label: "Duplicado", tone: "neutral" },
-  error: { label: "Error", tone: "fail" },
-  ignored: { label: "Ignorado", tone: "misaligned" },
+function logStatus(s: LogStatus, tone: Tone) {
+  return {
+    get label() {
+      return t(`ingest.status.${s}`);
+    },
+    tone,
+  };
+}
+
+/** Labels are getters so they follow the active locale. */
+export const LOG_STATUS: Record<LogStatus, { readonly label: string; tone: Tone }> = {
+  ok: logStatus("ok", "pass"),
+  duplicate: logStatus("duplicate", "neutral"),
+  error: logStatus("error", "fail"),
+  ignored: logStatus("ignored", "misaligned"),
 };
 
-/** Lowercase plural form used in count badges ("3 duplicados"). */
-export const LOG_STATUS_COUNT: Record<LogStatus, string> = {
-  ok: "correctos",
-  duplicate: "duplicados",
-  error: "con error",
-  ignored: "ignorados",
-};
+/** Lowercase count phrase used in count badges ("3 duplicates"). */
+export const logStatusCount = (s: LogStatus, n: number) => i18n.global.t(`ingest.statusCount.${s}`, { n: num(n) }, n);
 
-export const KIND_LABEL: Record<string, string> = {
-  aggregate: "Agregado",
-  forensic: "Forense",
-  unknown: "Desconocido",
-};
+export function kindLabel(kind: string): string {
+  return kind === "aggregate" || kind === "forensic" || kind === "unknown" ? t(`ingest.kind.${kind}`) : kind;
+}

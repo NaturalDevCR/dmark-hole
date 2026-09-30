@@ -1,0 +1,30 @@
+export default {
+  title: "Alertas",
+  subtitle: "Eventos que requieren su atención: fuentes sospechosas, caídas de cumplimiento y cambios DNS",
+  markAllRead: "Marcar todas como leídas",
+  allMarkedRead: "Todas las alertas marcadas como leídas",
+  filter: { all: "Todas", unread: "No leídas" },
+  type: {
+    new_failing_source: "Fuente nueva",
+    compliance_drop: "Cumplimiento",
+    forensic_report: "Forense",
+    dns_change: "Cambio DNS",
+  },
+  unreadDot: "Sin leer",
+  viewForensic: "Ver forenses",
+  markRead: "Marcar como leída",
+  delete: "Eliminar",
+  deleted: "Alerta eliminada",
+  empty: {
+    unreadTitle: "No tiene alertas sin leer",
+    unreadDescription: "Está al día. Las nuevas alertas aparecerán aquí.",
+    title: "Aún no hay alertas",
+    description: "Se generan automáticamente cuando aparece una fuente sospechosa, cae el cumplimiento o cambia la configuración DNS. Puede ajustar las reglas en Configuración.",
+    configure: "Configurar alertas",
+    viewAll: "Ver todas",
+  },
+  confirmDelete: {
+    title: "Eliminar alerta",
+    message: "La alerta se eliminará de forma permanente.",
+  },
+};

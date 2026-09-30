@@ -1,0 +1,58 @@
+export default {
+  subtitle: "Autenticación de correo de todos sus dominios · últimos {days} días",
+  empty: {
+    title: "Aún no hay dominios",
+    description: "Agregue un dominio y configure un buzón IMAP o el receptor SMTP para empezar a recibir reportes DMARC.",
+    addDomain: "Agregar dominio",
+    setupIngest: "Configurar ingesta",
+  },
+  kpi: {
+    messages: "Mensajes analizados",
+    vsPrevious: "vs. periodo anterior",
+    compliance: "Cumplimiento DMARC",
+    alignedHint: "SPF {spf} · DKIM {dkim} alineados",
+    sources: "Fuentes de envío",
+    reportsHint: "{n} reporte | {n} reportes",
+    unauthenticated: "No autenticados",
+    dispositionHint: "{reject} rechazados · {quarantine} en cuarentena",
+  },
+  noData: {
+    title: "Sin reportes en este periodo",
+    description: "Los proveedores envían reportes agregados una vez al día. Revise la sección Ingesta o amplíe el rango de fechas.",
+  },
+  volume: { title: "Volumen por resultado", subtitle: "Mensajes diarios según la clasificación DMARC" },
+  composition: { title: "Composición del tráfico", centerLabel: "pasa DMARC" },
+  health: {
+    title: "Salud por dominio",
+    subtitle: "Puntuación combinada de cumplimiento y configuración DNS",
+    cols: {
+      domain: "Dominio",
+      health: "Salud",
+      policy: "Política",
+      messages: "Mensajes",
+      classification: "Clasificación",
+      compliance: "Cumplimiento",
+      lastReport: "Último reporte",
+    },
+  },
+  trend: { title: "Tendencia de cumplimiento", subtitle: "% de mensajes que pasan DMARC por día" },
+  reporters: {
+    title: "Proveedores que reportan",
+    subtitle: "Organizaciones que envían reportes agregados",
+    reports: "{n} rep. | {n} rep.",
+  },
+  providers: {
+    title: "Principales servicios de envío",
+    subtitle: "Agrupados por proveedor detectado (PTR / ASN)",
+    explore: "Explorar fuentes",
+    ips: "{n} IP | {n} IP",
+  },
+  suspicious: {
+    title: "Fuentes sospechosas",
+    subtitle: "IPs cuyo correo falla SPF y DKIM",
+    viewAll: "Ver todas",
+    emptyTitle: "Sin fuentes sospechosas",
+    emptyDescription: "Ninguna IP envió correo no autenticado en este periodo.",
+    cols: { origin: "Origen", domains: "Dominios", failed: "Fallidos" },
+  },
+};

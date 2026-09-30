@@ -1,0 +1,58 @@
+export default {
+  subtitle: "Email authentication across all your domains · last {days} days",
+  empty: {
+    title: "No domains yet",
+    description: "Add a domain and set up an IMAP mailbox or the SMTP receiver to start receiving DMARC reports.",
+    addDomain: "Add domain",
+    setupIngest: "Set up ingestion",
+  },
+  kpi: {
+    messages: "Messages analyzed",
+    vsPrevious: "vs. previous period",
+    compliance: "DMARC compliance",
+    alignedHint: "SPF {spf} · DKIM {dkim} aligned",
+    sources: "Sending sources",
+    reportsHint: "{n} report | {n} reports",
+    unauthenticated: "Unauthenticated",
+    dispositionHint: "{reject} rejected · {quarantine} quarantined",
+  },
+  noData: {
+    title: "No reports in this period",
+    description: "Providers send aggregate reports once a day. Check the Ingestion section or widen the date range.",
+  },
+  volume: { title: "Volume by result", subtitle: "Daily messages by DMARC classification" },
+  composition: { title: "Traffic composition", centerLabel: "passes DMARC" },
+  health: {
+    title: "Health by domain",
+    subtitle: "Combined score of compliance and DNS configuration",
+    cols: {
+      domain: "Domain",
+      health: "Health",
+      policy: "Policy",
+      messages: "Messages",
+      classification: "Classification",
+      compliance: "Compliance",
+      lastReport: "Last report",
+    },
+  },
+  trend: { title: "Compliance trend", subtitle: "% of messages passing DMARC per day" },
+  reporters: {
+    title: "Reporting providers",
+    subtitle: "Organizations sending aggregate reports",
+    reports: "{n} report | {n} reports",
+  },
+  providers: {
+    title: "Top sending services",
+    subtitle: "Grouped by detected provider (PTR / ASN)",
+    explore: "Explore sources",
+    ips: "{n} IP | {n} IPs",
+  },
+  suspicious: {
+    title: "Suspicious sources",
+    subtitle: "IPs whose mail fails SPF and DKIM",
+    viewAll: "View all",
+    emptyTitle: "No suspicious sources",
+    emptyDescription: "No IP sent unauthenticated mail in this period.",
+    cols: { origin: "Origin", domains: "Domains", failed: "Failed" },
+  },
+};

@@ -1,0 +1,30 @@
+export default {
+  title: "Alerts",
+  subtitle: "Events that need your attention: suspicious sources, compliance drops and DNS changes",
+  markAllRead: "Mark all as read",
+  allMarkedRead: "All alerts marked as read",
+  filter: { all: "All", unread: "Unread" },
+  type: {
+    new_failing_source: "New source",
+    compliance_drop: "Compliance",
+    forensic_report: "Forensic",
+    dns_change: "DNS change",
+  },
+  unreadDot: "Unread",
+  viewForensic: "View forensic reports",
+  markRead: "Mark as read",
+  delete: "Delete",
+  deleted: "Alert deleted",
+  empty: {
+    unreadTitle: "No unread alerts",
+    unreadDescription: "You're all caught up. New alerts will appear here.",
+    title: "No alerts yet",
+    description: "They are generated automatically when a suspicious source appears, compliance drops or the DNS configuration changes. You can adjust the rules in Settings.",
+    configure: "Configure alerts",
+    viewAll: "View all",
+  },
+  confirmDelete: {
+    title: "Delete alert",
+    message: "The alert will be permanently deleted.",
+  },
+};

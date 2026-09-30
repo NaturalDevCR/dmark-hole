@@ -10,7 +10,7 @@ const initial = (typeof route.query.status === "string" ? route.query.status : n
 </script>
 
 <template>
-  <PageHeader title="Fuentes de envío" subtitle="Todos los servidores que envían correo en nombre de sus dominios">
+  <PageHeader :title="$t('sources.title')" :subtitle="$t('sources.subtitle')">
     <RangePicker />
   </PageHeader>
   <SourcesExplorer :initial-status="initial" />

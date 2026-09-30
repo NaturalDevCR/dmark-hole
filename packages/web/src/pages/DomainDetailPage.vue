@@ -2,6 +2,7 @@
 import { Activity, AlertOctagon, ArrowLeft, FileText, Globe, LayoutDashboard, MailCheck, Network, Plus, Settings, Trash2, X } from "lucide-vue-next";
 import { storeToRefs } from "pinia";
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import BarList from "@/components/charts/BarList.vue";
 import ComplianceChart from "@/components/charts/ComplianceChart.vue";
@@ -28,6 +29,7 @@ import { useAuth } from "@/stores/auth";
 import { useFilters } from "@/stores/filters";
 
 const props = defineProps<{ id: string }>();
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const auth = useAuth();
@@ -35,7 +37,7 @@ const { query, days } = storeToRefs(useFilters());
 const domainId = computed(() => Number(props.id));
 
 const tab = ref(typeof route.query.tab === "string" ? route.query.tab : "overview");
-watch(tab, (t) => router.replace({ query: { ...route.query, tab: t === "overview" ? undefined : t } }));
+watch(tab, (v) => router.replace({ query: { ...route.query, tab: v === "overview" ? undefined : v } }));
 
 const domain = useLoader(() => api.get<DomainDetail>(`/domains/${domainId.value}`));
 const recs = useLoader(() => api.get<Recommendation[]>(`/domains/${domainId.value}/recommendations`));
@@ -67,19 +69,19 @@ const health = computed(() => {
 });
 
 const tabs = computed(() => [
-  { id: "overview", label: "Resumen", icon: LayoutDashboard },
-  { id: "sources", label: "Fuentes", icon: Network, count: ov.value?.sources ?? null },
-  { id: "dns", label: "DNS", icon: Globe },
-  { id: "reports", label: "Reportes", icon: FileText, count: ov.value?.reports ?? null },
-  { id: "settings", label: "Configuración", icon: Settings },
+  { id: "overview", label: t("domains.detail.tabs.overview"), icon: LayoutDashboard },
+  { id: "sources", label: t("domains.detail.tabs.sources"), icon: Network, count: ov.value?.sources ?? null },
+  { id: "dns", label: t("domains.detail.tabs.dns"), icon: Globe },
+  { id: "reports", label: t("domains.detail.tabs.reports"), icon: FileText, count: ov.value?.reports ?? null },
+  { id: "settings", label: t("domains.detail.tabs.settings"), icon: Settings },
 ]);
 
 // Authentication matrix: SPF state × DKIM state.
-const AUTH_STATES = [
-  { key: "aligned", label: "Alineado" },
-  { key: "unaligned", label: "Pasa, sin alinear" },
-  { key: "fail", label: "Falla / ausente" },
-] as const;
+const AUTH_STATES = computed(() => [
+  { key: "aligned", label: t("domains.detail.matrix.states.aligned") },
+  { key: "unaligned", label: t("domains.detail.matrix.states.unaligned") },
+  { key: "fail", label: t("domains.detail.matrix.states.fail") },
+]);
 const matrix = computed(() => {
   const m: Record<string, number> = {};
   for (const r of stats.data.value?.auth ?? []) m[`${r.spf}|${r.dkim}`] = r.messages;
@@ -108,7 +110,7 @@ async function save() {
   saving.value = true;
   const ok = await withToast(
     () => api.patch(`/domains/${domainId.value}`, { displayName: form.value.displayName, notes: form.value.notes, dkimSelectors: form.value.selectors }),
-    "Cambios guardados",
+    t("domains.detail.settings.saved"),
   );
   saving.value = false;
   if (ok) domain.reload();
@@ -124,18 +126,18 @@ function addSelector() {
 const confirmDelete = ref(false);
 async function remove() {
   confirmDelete.value = false;
-  const ok = await withToast(() => api.del(`/domains/${domainId.value}`), "Dominio eliminado");
+  const ok = await withToast(() => api.del(`/domains/${domainId.value}`), t("domains.detail.settings.danger.deleted"));
   if (ok) router.push("/domains");
 }
 </script>
 
 <template>
-  <div v-if="domain.error.value" class="card"><Empty title="Dominio no encontrado" :description="domain.error.value"><RouterLink to="/domains" class="btn-secondary">Volver</RouterLink></Empty></div>
+  <div v-if="domain.error.value" class="card"><Empty :title="$t('domains.detail.notFound')" :description="domain.error.value"><RouterLink to="/domains" class="btn-secondary">{{ $t("common.nav.back") }}</RouterLink></Empty></div>
 
   <template v-else>
     <PageHeader :title="d?.name ?? '…'" :subtitle="d?.displayName ?? undefined">
       <template #eyebrow>
-        <RouterLink to="/domains" class="inline-flex items-center gap-1 hover:text-fg"><ArrowLeft class="size-3.5" />Dominios</RouterLink>
+        <RouterLink to="/domains" class="inline-flex items-center gap-1 hover:text-fg"><ArrowLeft class="size-3.5" />{{ $t("common.nav.domains") }}</RouterLink>
       </template>
       <div class="flex items-center gap-3">
         <PolicyBadge v-if="d" :policy="policy" :pct="d.dnsResult?.dmarc.tags.pct ? Number(d.dnsResult.dmarc.tags.pct) : null" />
@@ -150,31 +152,31 @@ async function remove() {
     <div v-if="tab === 'overview'" class="space-y-6">
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <template v-if="ov">
-          <Stat label="Mensajes" :value="short(ov.messages)" :icon="Activity" :hint="`${num(ov.reports)} reportes · ${days} días`" />
-          <Stat label="Cumplimiento DMARC" :value="pct(ov.compliance)" :icon="MailCheck" tone="pass" :hint="`SPF ${pct(ov.spfAlignedRate)} · DKIM ${pct(ov.dkimAlignedRate)} alineados`" />
-          <Stat label="Fuentes" :value="num(ov.sources)" :icon="Network" tone="forwarded" :hint="`${num(ov.categories.misaligned)} mensajes sin alinear`" />
-          <Stat label="No autenticados" :value="short(ov.categories.fail)" :icon="AlertOctagon" tone="fail" :hint="`${num(ov.disposition.reject)} rechazados · ${num(ov.disposition.quarantine)} cuarentena`" />
+          <Stat :label="$t('domains.detail.kpi.messages')" :value="short(ov.messages)" :icon="Activity" :hint="$t('domains.detail.kpi.reportsHint', { n: num(ov.reports), days }, ov.reports)" />
+          <Stat :label="$t('domains.detail.kpi.compliance')" :value="pct(ov.compliance)" :icon="MailCheck" tone="pass" :hint="$t('domains.detail.kpi.alignedHint', { spf: pct(ov.spfAlignedRate), dkim: pct(ov.dkimAlignedRate) })" />
+          <Stat :label="$t('domains.detail.kpi.sources')" :value="num(ov.sources)" :icon="Network" tone="forwarded" :hint="$t('domains.detail.kpi.misalignedHint', { n: num(ov.categories.misaligned) }, ov.categories.misaligned)" />
+          <Stat :label="$t('domains.detail.kpi.unauthenticated')" :value="short(ov.categories.fail)" :icon="AlertOctagon" tone="fail" :hint="$t('domains.detail.kpi.dispositionHint', { reject: num(ov.disposition.reject), quarantine: num(ov.disposition.quarantine) })" />
         </template>
         <template v-else><Skeleton v-for="i in 4" :key="i" class="h-[132px]" /></template>
       </div>
 
-      <Card title="Recomendaciones" subtitle="Acciones priorizadas según los reportes y la configuración DNS" flush>
+      <Card :title="$t('domains.detail.recs.title')" :subtitle="$t('domains.detail.recs.subtitle')" flush>
         <div v-if="recs.loading.value && !recs.data.value" class="p-5"><Skeleton class="h-24" /></div>
         <RecommendationList v-else-if="recs.data.value?.length" :items="recs.data.value" />
-        <Empty v-else title="Sin recomendaciones" />
+        <Empty v-else :title="$t('domains.detail.recs.empty')" />
       </Card>
 
       <div class="grid gap-6 xl:grid-cols-3">
-        <Card title="Volumen por resultado" class="xl:col-span-2">
+        <Card :title="$t('domains.detail.volumeTitle')" class="xl:col-span-2">
           <VolumeChart v-if="stats.data.value" :data="stats.data.value.ts" />
           <Skeleton v-else class="h-[280px]" />
         </Card>
-        <Card title="Matriz de autenticación" subtitle="Mensajes según el estado de SPF y DKIM">
+        <Card :title="$t('domains.detail.matrix.title')" :subtitle="$t('domains.detail.matrix.subtitle')">
           <div v-if="matrixTotal" class="overflow-x-auto">
             <table class="w-full text-xs">
               <thead>
                 <tr>
-                  <th class="p-1 text-left font-medium text-muted">SPF ↓ / DKIM →</th>
+                  <th class="p-1 text-left font-medium text-muted">{{ $t("domains.detail.matrix.corner") }}</th>
                   <th v-for="k in AUTH_STATES" :key="k.key" class="p-1 text-center font-medium text-muted">{{ k.label }}</th>
                 </tr>
               </thead>
@@ -184,7 +186,7 @@ async function remove() {
                   <td v-for="k in AUTH_STATES" :key="k.key" class="p-1">
                     <div
                       class="relative grid h-14 place-items-center overflow-hidden rounded-lg border border-line"
-                      :title="`${num(matrix[`${s.key}|${k.key}`] ?? 0)} mensajes`"
+                      :title="$t('domains.detail.matrix.cellTitle', { n: num(matrix[`${s.key}|${k.key}`] ?? 0) }, matrix[`${s.key}|${k.key}`] ?? 0)"
                     >
                       <span class="absolute inset-0" :class="cellClass(s.key, k.key)" :style="{ opacity: 0.08 + 0.6 * Math.sqrt((matrix[`${s.key}|${k.key}`] ?? 0) / matrixTotal) }" />
                       <span class="relative font-semibold tabular-nums">{{ pct(ratio(matrix[`${s.key}|${k.key}`] ?? 0, matrixTotal)) }}</span>
@@ -193,23 +195,25 @@ async function remove() {
                 </tr>
               </tbody>
             </table>
-            <p class="mt-3 text-xs text-muted">Basta con que SPF <b>o</b> DKIM esté alineado para pasar DMARC. DKIM alineado es más robusto: sobrevive al reenvío.</p>
+            <i18n-t keypath="domains.detail.matrix.note" tag="p" class="mt-3 text-xs text-muted">
+              <template #or><b>{{ $t("domains.detail.matrix.noteOr") }}</b></template>
+            </i18n-t>
           </div>
-          <Empty v-else title="Sin datos" />
+          <Empty v-else :title="$t('domains.detail.matrix.empty')" />
         </Card>
       </div>
 
       <div class="grid gap-6 xl:grid-cols-3">
-        <Card title="Tendencia de cumplimiento" class="xl:col-span-2">
+        <Card :title="$t('domains.detail.trendTitle')" class="xl:col-span-2">
           <ComplianceChart v-if="stats.data.value" :days="stats.data.value.ts.days" :values="stats.data.value.ts.series.compliance" />
         </Card>
-        <Card title="Quién reporta">
+        <Card :title="$t('domains.detail.whoReports.title')">
           <BarList
             v-if="stats.data.value?.reporters.length"
             :items="stats.data.value.reporters.slice(0, 8).map((r) => ({ key: r.name, label: r.name, value: r.messages, sub: pct(r.compliance), to: `/reports?domainId=${domainId}&org=${encodeURIComponent(r.name)}` }))"
             :value-label="short"
           />
-          <Empty v-else title="Sin reportes" />
+          <Empty v-else :title="$t('domains.detail.whoReports.empty')" />
         </Card>
       </div>
     </div>
@@ -221,12 +225,12 @@ async function remove() {
       <Skeleton v-else class="h-96" />
     </template>
 
-    <Card v-else-if="tab === 'reports'" title="Últimos reportes" flush>
-      <template #actions><RouterLink :to="`/reports?domainId=${domainId}`" class="btn-ghost btn-sm">Ver todos</RouterLink></template>
-      <Empty v-if="reports.data.value && !reports.data.value.items.length" title="Sin reportes en este periodo" />
+    <Card v-else-if="tab === 'reports'" :title="$t('domains.detail.reports.title')" flush>
+      <template #actions><RouterLink :to="`/reports?domainId=${domainId}`" class="btn-ghost btn-sm">{{ $t("common.actions.viewAll") }}</RouterLink></template>
+      <Empty v-if="reports.data.value && !reports.data.value.items.length" :title="$t('domains.detail.reports.empty')" />
       <div v-else class="overflow-x-auto">
         <table class="table">
-          <thead><tr><th>Reporter</th><th>Periodo</th><th class="text-right">Mensajes</th><th class="text-right">Pasa DMARC</th><th>Recibido</th></tr></thead>
+          <thead><tr><th>{{ $t("domains.detail.reports.cols.reporter") }}</th><th>{{ $t("domains.detail.reports.cols.period") }}</th><th class="text-right">{{ $t("domains.detail.reports.cols.messages") }}</th><th class="text-right">{{ $t("domains.detail.reports.cols.dmarcPass") }}</th><th>{{ $t("domains.detail.reports.cols.received") }}</th></tr></thead>
           <tbody>
             <tr v-for="r in reports.data.value?.items ?? []" :key="r.id" class="row-link" @click="router.push(`/reports/${r.id}`)">
               <td class="font-medium">{{ r.orgName }}</td>
@@ -241,62 +245,65 @@ async function remove() {
     </Card>
 
     <div v-else-if="tab === 'settings' && d" class="grid gap-6 xl:grid-cols-3">
-      <Card title="Detalles" class="xl:col-span-2">
+      <Card :title="$t('domains.detail.settings.details')" class="xl:col-span-2">
         <form class="space-y-4" @submit.prevent="save">
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
-              <label class="label">Dominio</label>
+              <label class="label">{{ $t("domains.detail.settings.domain") }}</label>
               <input class="input" :value="d.name" disabled />
             </div>
             <div>
-              <label class="label" for="dn">Nombre descriptivo</label>
+              <label class="label" for="dn">{{ $t("domains.detail.settings.displayName") }}</label>
               <input id="dn" v-model="form.displayName" class="input" :disabled="!auth.isAdmin" />
             </div>
           </div>
           <div>
-            <label class="label" for="nt">Notas</label>
+            <label class="label" for="nt">{{ $t("domains.detail.settings.notes") }}</label>
             <textarea id="nt" v-model="form.notes" class="input min-h-24" :disabled="!auth.isAdmin" />
           </div>
           <div>
-            <label class="label">Selectores DKIM monitoreados</label>
-            <p class="mb-2 text-xs text-muted">Se detectan solos a partir de los reportes. Agregue otros para validar sus claves (formato <code class="mono">selector</code> o <code class="mono">selector:dominio</code>).</p>
+            <label class="label">{{ $t("domains.detail.settings.selectors.label") }}</label>
+            <i18n-t keypath="domains.detail.settings.selectors.help" tag="p" class="mb-2 text-xs text-muted">
+              <template #selector><code class="mono">{{ $t("domains.detail.settings.selectors.selectorFormat") }}</code></template>
+              <template #selectorDomain><code class="mono">{{ $t("domains.detail.settings.selectors.selectorDomainFormat") }}</code></template>
+            </i18n-t>
             <div class="flex flex-wrap gap-2">
               <span v-for="(s, i) in form.selectors" :key="s" class="mono inline-flex items-center gap-1 rounded-md border border-line bg-subtle px-2 py-1">
                 {{ s }}
                 <button v-if="auth.isAdmin" type="button" class="text-faint hover:text-fail" @click="form.selectors.splice(i, 1)"><X class="size-3.5" /></button>
               </span>
-              <span v-if="!form.selectors.length" class="text-sm text-faint">Ninguno todavía</span>
+              <span v-if="!form.selectors.length" class="text-sm text-faint">{{ $t("domains.detail.settings.selectors.none") }}</span>
             </div>
             <div v-if="auth.isAdmin" class="mt-2 flex max-w-sm gap-2">
-              <input v-model="newSelector" class="input" placeholder="selector1" @keydown.enter.prevent="addSelector" />
+              <input v-model="newSelector" class="input" :placeholder="$t('domains.detail.settings.selectors.placeholder')" @keydown.enter.prevent="addSelector" />
               <button type="button" class="btn-secondary" @click="addSelector"><Plus class="size-4" /></button>
             </div>
           </div>
           <div v-if="auth.isAdmin" class="flex justify-end">
-            <button class="btn-primary" :disabled="saving"><Spinner v-if="saving" />Guardar</button>
+            <button class="btn-primary" :disabled="saving"><Spinner v-if="saving" />{{ $t("common.actions.save") }}</button>
           </div>
         </form>
       </Card>
       <div class="space-y-6">
-        <Card title="Información">
+        <Card :title="$t('domains.detail.settings.info.title')">
           <dl class="space-y-2 text-sm">
-            <div class="flex justify-between gap-2"><dt class="text-muted">Agregado</dt><dd>{{ date(d.createdAt) }}</dd></div>
-            <div class="flex justify-between gap-2"><dt class="text-muted">Origen</dt><dd>{{ d.autoCreated ? "Detectado en un reporte" : "Manual" }}</dd></div>
-            <div class="flex justify-between gap-2"><dt class="text-muted">Última verificación DNS</dt><dd>{{ ago(d.dnsCheckedAt) }}</dd></div>
+            <div class="flex justify-between gap-2"><dt class="text-muted">{{ $t("domains.detail.settings.info.added") }}</dt><dd>{{ date(d.createdAt) }}</dd></div>
+            <div class="flex justify-between gap-2"><dt class="text-muted">{{ $t("domains.detail.settings.info.source") }}</dt><dd>{{ d.autoCreated ? $t("domains.detail.settings.info.sourceDetected") : $t("domains.detail.settings.info.sourceManual") }}</dd></div>
+            <div class="flex justify-between gap-2"><dt class="text-muted">{{ $t("domains.detail.settings.info.lastDnsCheck") }}</dt><dd>{{ ago(d.dnsCheckedAt) }}</dd></div>
           </dl>
         </Card>
-        <Card v-if="auth.isAdmin" title="Zona de peligro">
-          <p class="mb-3 text-sm text-muted">Elimina el dominio con todos sus reportes, fuentes y alertas. No se puede deshacer.</p>
-          <button class="btn-danger" @click="confirmDelete = true"><Trash2 class="size-4" />Eliminar dominio</button>
+        <Card v-if="auth.isAdmin" :title="$t('domains.detail.settings.danger.title')">
+          <p class="mb-3 text-sm text-muted">{{ $t("domains.detail.settings.danger.description") }}</p>
+          <button class="btn-danger" @click="confirmDelete = true"><Trash2 class="size-4" />{{ $t("domains.detail.settings.danger.delete") }}</button>
         </Card>
       </div>
     </div>
 
     <Confirm
       v-if="confirmDelete"
-      title="Eliminar dominio"
-      :message="`¿Eliminar ${d?.name} y todos sus datos? Si siguen llegando reportes, el dominio podría volver a crearse automáticamente.`"
-      confirm-label="Eliminar"
+      :title="$t('domains.detail.settings.danger.confirmTitle')"
+      :message="$t('domains.detail.settings.danger.confirmMessage', { name: d?.name ?? '' })"
+      :confirm-label="$t('common.actions.delete')"
       danger
       @close="confirmDelete = false"
       @confirm="remove"

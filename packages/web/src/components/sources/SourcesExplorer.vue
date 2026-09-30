@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Download, Search } from "lucide-vue-next";
 import { refDebounced } from "@vueuse/core";
 import { storeToRefs } from "pinia";
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import StackBar from "@/components/charts/StackBar.vue";
 import IpCell from "@/components/dmarc/IpCell.vue";
 import SourceStatusBadge from "@/components/dmarc/SourceStatusBadge.vue";
@@ -16,6 +17,7 @@ import { useLoader } from "@/lib/useLoader";
 import { useFilters } from "@/stores/filters";
 
 const props = defineProps<{ domainId?: number; initialStatus?: SourceStatus | null }>();
+const { t } = useI18n();
 const { query } = storeToRefs(useFilters());
 
 const search = ref("");
@@ -36,7 +38,7 @@ const { data, loading } = useLoader(
   [params, debounced],
 );
 
-const providerName = (s: Source) => s.provider ?? (s.asName ? s.asName.replace(/,\s*[A-Z]{2}$/, "") : "Desconocido");
+const providerName = (s: Source) => s.provider ?? (s.asName ? s.asName.replace(/,\s*[A-Z]{2}$/, "") : t("common.unknown"));
 const rows = computed(() =>
   (data.value?.sources ?? []).filter((s) => (!status.value || s.status === status.value) && (!provider.value || providerName(s) === provider.value)),
 );
@@ -64,19 +66,19 @@ const statuses = Object.keys(SOURCE_STATUS) as SourceStatus[];
 
 <template>
   <div class="space-y-6">
-    <Card title="Servicios de envío" subtitle="Fuentes agrupadas por proveedor detectado vía DNS inverso y ASN" flush>
+    <Card :title="$t('sources.providers.title')" :subtitle="$t('sources.providers.subtitle')" flush>
       <div v-if="loading && !data" class="p-5"><Skeleton class="h-40" /></div>
-      <Empty v-else-if="!data?.providers.length" title="Sin fuentes en este periodo" />
+      <Empty v-else-if="!data?.providers.length" :title="$t('sources.providers.empty')" />
       <div v-else class="overflow-x-auto">
         <table class="table">
           <thead>
             <tr>
-              <th>Proveedor</th>
-              <th>Estado</th>
-              <th class="text-right">IPs</th>
-              <th class="text-right">Mensajes</th>
-              <th class="w-64">Resultado</th>
-              <th class="text-right">Pasa DMARC</th>
+              <th>{{ $t("sources.providers.cols.provider") }}</th>
+              <th>{{ $t("sources.providers.cols.status") }}</th>
+              <th class="text-right">{{ $t("sources.providers.cols.ips") }}</th>
+              <th class="text-right">{{ $t("sources.providers.cols.messages") }}</th>
+              <th class="w-64">{{ $t("sources.providers.cols.result") }}</th>
+              <th class="text-right">{{ $t("sources.providers.cols.dmarcPass") }}</th>
             </tr>
           </thead>
           <tbody>
@@ -102,9 +104,9 @@ const statuses = Object.keys(SOURCE_STATUS) as SourceStatus[];
     <Card flush>
       <template #header>
         <div class="flex w-full flex-wrap items-center gap-2">
-          <h3 class="card-title mr-2">Direcciones IP</h3>
+          <h3 class="card-title mr-2">{{ $t("sources.ips.title") }}</h3>
           <button class="btn-sm rounded-full border px-3 py-1 text-xs" :class="!status ? 'border-brand bg-brand-soft text-brand' : 'border-line text-muted hover:text-fg'" @click="status = null">
-            Todas <span class="tabular-nums opacity-70">{{ data?.sources.length ?? 0 }}</span>
+            {{ $t("sources.ips.all") }} <span class="tabular-nums opacity-70">{{ data?.sources.length ?? 0 }}</span>
           </button>
           <button
             v-for="s in statuses"
@@ -122,27 +124,27 @@ const statuses = Object.keys(SOURCE_STATUS) as SourceStatus[];
           <div class="ml-auto flex items-center gap-2">
             <div class="relative">
               <Search class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-faint" />
-              <input v-model="search" class="input w-56 py-1.5 pl-8 text-xs" placeholder="IP, PTR, proveedor, ASN…" />
+              <input v-model="search" class="input w-56 py-1.5 pl-8 text-xs" :placeholder="$t('sources.ips.searchPlaceholder')" />
             </div>
-            <a class="btn-secondary btn-sm" :href="api.url('/export/records.csv', params)"><Download class="size-3.5" />CSV</a>
+            <a class="btn-secondary btn-sm" :href="api.url('/export/records.csv', params)"><Download class="size-3.5" />{{ $t("sources.ips.csv") }}</a>
           </div>
         </div>
       </template>
 
       <div v-if="loading && !data" class="p-5"><Skeleton class="h-64" /></div>
-      <Empty v-else-if="!rows.length" title="Sin resultados" description="Pruebe con otro filtro o amplíe el rango de fechas." />
+      <Empty v-else-if="!rows.length" :title="$t('sources.ips.emptyTitle')" :description="$t('sources.ips.emptyDescription')" />
       <div v-else class="overflow-x-auto">
         <table class="table">
           <thead>
             <tr>
               <th class="w-8" />
-              <th>Origen</th>
-              <th>Estado</th>
-              <th class="text-right">Mensajes</th>
-              <th class="w-48">Resultado</th>
-              <th class="text-right">SPF alin.</th>
-              <th class="text-right">DKIM alin.</th>
-              <th>Visto</th>
+              <th>{{ $t("sources.ips.cols.origin") }}</th>
+              <th>{{ $t("sources.ips.cols.status") }}</th>
+              <th class="text-right">{{ $t("sources.ips.cols.messages") }}</th>
+              <th class="w-48">{{ $t("sources.ips.cols.result") }}</th>
+              <th class="text-right">{{ $t("sources.ips.cols.spfAligned") }}</th>
+              <th class="text-right">{{ $t("sources.ips.cols.dkimAligned") }}</th>
+              <th>{{ $t("sources.ips.cols.seen") }}</th>
             </tr>
           </thead>
           <tbody>
@@ -165,23 +167,23 @@ const statuses = Object.keys(SOURCE_STATUS) as SourceStatus[];
                 <td colspan="7" class="py-4">
                   <div class="grid gap-4 text-sm md:grid-cols-4">
                     <div>
-                      <p class="label">Red</p>
+                      <p class="label">{{ $t("sources.ips.expanded.network") }}</p>
                       <p>{{ s.asName ?? "—" }}</p>
                       <p v-if="s.asn" class="text-xs text-muted">AS{{ s.asn }}</p>
                     </div>
                     <div>
-                      <p class="label">Dominios (From)</p>
+                      <p class="label">{{ $t("sources.ips.expanded.domains") }}</p>
                       <p class="break-words">{{ s.domains.join(", ") }}</p>
                     </div>
                     <div>
-                      <p class="label">Firmas DKIM</p>
-                      <p v-if="!s.dkimDomains.length" class="text-muted">Sin firma</p>
+                      <p class="label">{{ $t("sources.ips.expanded.dkimSignatures") }}</p>
+                      <p v-if="!s.dkimDomains.length" class="text-muted">{{ $t("sources.ips.expanded.noSignature") }}</p>
                       <p v-for="a in splitAuth(s.dkimDomains)" :key="a.domain + a.result" class="truncate">
                         <span :class="a.result === 'pass' ? 'text-pass' : 'text-fail'">●</span> {{ a.domain }} <span class="text-xs text-muted">{{ a.result }}</span>
                       </p>
                     </div>
                     <div>
-                      <p class="label">SPF (MAIL FROM)</p>
+                      <p class="label">{{ $t("sources.ips.expanded.spfMailFrom") }}</p>
                       <p v-if="!s.spfDomains.length" class="text-muted">—</p>
                       <p v-for="a in splitAuth(s.spfDomains)" :key="a.domain + a.result" class="truncate">
                         <span :class="a.result === 'pass' ? 'text-pass' : 'text-fail'">●</span> {{ a.domain }} <span class="text-xs text-muted">{{ a.result }}</span>
@@ -189,9 +191,9 @@ const statuses = Object.keys(SOURCE_STATUS) as SourceStatus[];
                     </div>
                   </div>
                   <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted">
-                    <span>Autenticado {{ num(s.pass) }} · Reenviado {{ num(s.forwarded) }} · Sin alinear {{ num(s.misaligned) }} · No autenticado {{ num(s.fail) }}</span>
-                    <span>Cuarentena {{ num(s.dispositions.quarantine) }} · Rechazo {{ num(s.dispositions.reject) }}</span>
-                    <RouterLink :to="`/sources/${encodeURIComponent(s.ip)}`" class="ml-auto font-medium text-brand hover:underline">Ver detalle →</RouterLink>
+                    <span>{{ $t("sources.ips.expanded.breakdown", { pass: num(s.pass), forwarded: num(s.forwarded), misaligned: num(s.misaligned), fail: num(s.fail) }) }}</span>
+                    <span>{{ $t("sources.ips.expanded.dispositions", { quarantine: num(s.dispositions.quarantine), reject: num(s.dispositions.reject) }) }}</span>
+                    <RouterLink :to="`/sources/${encodeURIComponent(s.ip)}`" class="ml-auto font-medium text-brand hover:underline">{{ $t("sources.ips.expanded.viewDetail") }}</RouterLink>
                   </div>
                 </td>
               </tr>
@@ -199,7 +201,7 @@ const statuses = Object.keys(SOURCE_STATUS) as SourceStatus[];
           </tbody>
         </table>
         <div v-if="rows.length > shown" class="border-t border-line p-3 text-center">
-          <button class="btn-ghost btn-sm" @click="shown += 200">Mostrar más ({{ short(rows.length - shown) }} restantes)</button>
+          <button class="btn-ghost btn-sm" @click="shown += 200">{{ $t("common.actions.showMore", { count: short(rows.length - shown) }) }}</button>
         </div>
       </div>
     </Card>

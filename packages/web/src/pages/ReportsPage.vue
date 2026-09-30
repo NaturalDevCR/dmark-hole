@@ -54,42 +54,42 @@ const sourceLabel = (s: string) => {
 </script>
 
 <template>
-  <PageHeader title="Reportes agregados" :subtitle="`Reportes DMARC (RUA) recibidos de los proveedores · últimos ${days} días`">
+  <PageHeader :title="$t('reports.list.title')" :subtitle="$t('reports.list.subtitle', { days })">
     <RangePicker />
   </PageHeader>
 
   <div class="mb-4 flex flex-wrap items-end gap-3">
     <div class="w-full sm:w-64">
-      <label class="label" for="f-domain">Dominio</label>
+      <label class="label" for="f-domain">{{ $t("reports.list.domain") }}</label>
       <select id="f-domain" v-model="domainId" class="input">
-        <option value="">Todos los dominios</option>
+        <option value="">{{ $t("reports.list.allDomains") }}</option>
         <option v-for="d in domains ?? []" :key="d.id" :value="String(d.id)">{{ d.name }}</option>
       </select>
     </div>
     <div class="w-full sm:w-64">
-      <label class="label" for="f-org">Reportador</label>
+      <label class="label" for="f-org">{{ $t("reports.list.reporter") }}</label>
       <select id="f-org" v-model="org" class="input">
-        <option value="">Todos los reportadores</option>
+        <option value="">{{ $t("reports.list.allReporters") }}</option>
         <option v-for="o in orgs ?? []" :key="o" :value="o">{{ o }}</option>
       </select>
     </div>
-    <button v-if="filtered" class="btn-ghost" @click="clear"><FilterX class="size-4" />Limpiar filtros</button>
+    <button v-if="filtered" class="btn-ghost" @click="clear"><FilterX class="size-4" />{{ $t("reports.list.clearFilters") }}</button>
   </div>
 
   <section class="card overflow-hidden">
-    <div v-if="error" class="px-5 py-4 text-sm text-fail">No se pudieron cargar los reportes: {{ error }}</div>
+    <div v-if="error" class="px-5 py-4 text-sm text-fail">{{ $t("reports.list.loadError", { error }) }}</div>
     <div v-if="!data" class="space-y-2 p-4">
       <Skeleton v-for="i in 8" :key="i" class="h-12" />
     </div>
     <Empty
       v-else-if="!data.items.length"
       :icon="FileText"
-      title="No hay reportes para estos filtros"
-      description="Los proveedores envían reportes agregados una vez al día. Amplíe el rango de fechas, cambie los filtros o revise la sección Ingesta."
+      :title="$t('reports.list.empty.title')"
+      :description="$t('reports.list.empty.description')"
     >
       <div class="flex gap-2">
-        <button v-if="filtered" class="btn-secondary" @click="clear">Limpiar filtros</button>
-        <RouterLink to="/ingest" class="btn-secondary">Configurar ingesta</RouterLink>
+        <button v-if="filtered" class="btn-secondary" @click="clear">{{ $t("reports.list.clearFilters") }}</button>
+        <RouterLink to="/ingest" class="btn-secondary">{{ $t("reports.list.empty.setupIngest") }}</RouterLink>
       </div>
     </Empty>
     <template v-else>
@@ -97,14 +97,14 @@ const sourceLabel = (s: string) => {
         <table class="table">
           <thead>
             <tr>
-              <th>Reportador</th>
-              <th>Dominio</th>
-              <th>Periodo</th>
-              <th>Política</th>
-              <th class="text-right">Mensajes</th>
-              <th class="w-44">Cumplimiento</th>
-              <th class="text-right">Registros</th>
-              <th>Recibido</th>
+              <th>{{ $t("reports.list.table.reporter") }}</th>
+              <th>{{ $t("reports.list.table.domain") }}</th>
+              <th>{{ $t("reports.list.table.period") }}</th>
+              <th>{{ $t("reports.list.table.policy") }}</th>
+              <th class="text-right">{{ $t("reports.list.table.messages") }}</th>
+              <th class="w-44">{{ $t("reports.list.table.compliance") }}</th>
+              <th class="text-right">{{ $t("reports.list.table.records") }}</th>
+              <th>{{ $t("reports.list.table.received") }}</th>
             </tr>
           </thead>
           <tbody>
@@ -124,7 +124,7 @@ const sourceLabel = (s: string) => {
               <td>
                 <div class="flex items-center gap-2.5">
                   <span class="w-12 text-sm font-medium tabular-nums" :class="tone(compliance(r))">{{ compliance(r) === null ? "—" : `${compliance(r)}%` }}</span>
-                  <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-subtle" role="img" :aria-label="`${num(r.pass)} de ${num(r.messages)} mensajes pasan DMARC`">
+                  <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-subtle" role="img" :aria-label="$t('reports.list.complianceAria', { pass: num(r.pass), messages: num(r.messages) })">
                     <div class="h-full rounded-full" :class="bar(compliance(r))" :style="{ width: `${compliance(r) ?? 0}%` }" />
                   </div>
                 </div>

@@ -12,7 +12,8 @@ const bare = computed(() => route.meta.public === true);
   <RouterView v-if="bare" />
   <AppShell v-else>
     <RouterView v-slot="{ Component }">
-      <component :is="Component" :key="route.path" />
+      <!-- Keyed by locale too: server-translated data (DNS checks, alerts…) is refetched on language change. -->
+      <component :is="Component" :key="`${route.path}|${$i18n.locale}`" />
     </RouterView>
   </AppShell>
   <Toasts />

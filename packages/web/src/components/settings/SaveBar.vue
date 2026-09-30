@@ -6,9 +6,9 @@ defineEmits<{ reset: [] }>();
 
 <template>
   <div class="flex flex-wrap items-center justify-end gap-3 border-t border-line px-5 py-3.5">
-    <span v-if="dirty" class="mr-auto text-xs text-misaligned">Tiene cambios sin guardar</span>
+    <span v-if="dirty" class="mr-auto text-xs text-misaligned">{{ $t("settings.saveBar.unsaved") }}</span>
     <slot />
-    <button type="button" class="btn-ghost" :disabled="!dirty || saving" @click="$emit('reset')">Descartar</button>
-    <button type="submit" class="btn-primary" :disabled="!dirty || saving"><Spinner v-if="saving" />Guardar cambios</button>
+    <button type="button" class="btn-ghost" :disabled="!dirty || saving" @click="$emit('reset')">{{ $t("settings.saveBar.discard") }}</button>
+    <button type="submit" class="btn-primary" :disabled="!dirty || saving"><Spinner v-if="saving" />{{ $t("settings.saveBar.save") }}</button>
   </div>
 </template>

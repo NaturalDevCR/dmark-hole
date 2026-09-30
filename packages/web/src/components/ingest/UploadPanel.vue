@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { CheckCircle2, CircleSlash, Copy, TriangleAlert, UploadCloud, XCircle } from "lucide-vue-next";
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import Badge from "@/components/ui/Badge.vue";
 import Spinner from "@/components/ui/Spinner.vue";
 import { api, withToast } from "@/lib/api";
-import { num } from "@/lib/format";
-import { LOG_STATUS, LOG_STATUS_COUNT, type LogStatus } from "./status";
+import { LOG_STATUS, logStatusCount, type LogStatus } from "./status";
 
+const { t } = useI18n();
 const emit = defineEmits<{ uploaded: [] }>();
 
 interface UploadItem {
@@ -77,18 +78,23 @@ const total = (r: UploadResult, s: LogStatus) => r.counts?.[s] ?? 0;
       <span class="grid size-12 place-items-center rounded-xl bg-brand-soft text-brand">
         <Spinner v-if="uploading" class="size-5" /><UploadCloud v-else class="size-6" />
       </span>
-      <p class="mt-3 text-sm font-medium">{{ uploading ? "Procesando archivos…" : "Arrastre reportes aquí o haga clic para elegirlos" }}</p>
-      <p class="mt-1 max-w-md text-sm text-muted">Acepta reportes agregados (<span class="mono">.xml</span>, <span class="mono">.gz</span>, <span class="mono">.zip</span>) y mensajes con reportes adjuntos o forenses (<span class="mono">.eml</span>). Puede subir varios a la vez.</p>
+      <p class="mt-3 text-sm font-medium">{{ uploading ? t("ingest.upload.processing") : t("ingest.upload.drop") }}</p>
+      <i18n-t keypath="ingest.upload.accepts" tag="p" class="mt-1 max-w-md text-sm text-muted">
+        <template #xml><span class="mono">.xml</span></template>
+        <template #gz><span class="mono">.gz</span></template>
+        <template #zip><span class="mono">.zip</span></template>
+        <template #eml><span class="mono">.eml</span></template>
+      </i18n-t>
       <input ref="input" type="file" multiple :accept="ACCEPT" class="hidden" @change="onPick" />
     </div>
 
     <div v-if="results.length" class="space-y-3">
-      <h3 class="text-sm font-semibold">Resultado</h3>
+      <h3 class="text-sm font-semibold">{{ t("ingest.upload.result") }}</h3>
       <section v-for="(r, i) in results" :key="i" class="card">
         <header class="card-header">
           <p class="mono min-w-0 truncate font-medium">{{ r.file }}</p>
           <div class="flex shrink-0 flex-wrap items-center gap-1.5">
-            <Badge v-for="s in (['ok', 'duplicate', 'error', 'ignored'] as LogStatus[])" v-show="total(r, s) > 0" :key="s" :tone="LOG_STATUS[s].tone">{{ num(total(r, s)) }} {{ LOG_STATUS_COUNT[s] }}</Badge>
+            <Badge v-for="s in (['ok', 'duplicate', 'error', 'ignored'] as LogStatus[])" v-show="total(r, s) > 0" :key="s" :tone="LOG_STATUS[s].tone">{{ logStatusCount(s, total(r, s)) }}</Badge>
           </div>
         </header>
         <ul v-if="r.items.length" class="divide-y divide-line">
@@ -100,10 +106,10 @@ const total = (r: UploadResult, s: LogStatus) => r.counts?.[s] ?? 0;
                 <span v-if="it.domain" class="font-medium text-fg">{{ it.domain }} · </span>{{ it.message ?? LOG_STATUS[it.status].label }}
               </p>
             </div>
-            <RouterLink v-if="it.kind === 'aggregate' && it.reportId && it.status === 'ok'" :to="`/reports/${it.reportId}`" class="btn-ghost btn-sm shrink-0">Ver reporte</RouterLink>
+            <RouterLink v-if="it.kind === 'aggregate' && it.reportId && it.status === 'ok'" :to="`/reports/${it.reportId}`" class="btn-ghost btn-sm shrink-0">{{ t("ingest.viewReport") }}</RouterLink>
           </li>
         </ul>
-        <p v-else class="px-5 py-4 text-sm text-muted">No se reconoció ningún reporte dentro del archivo.</p>
+        <p v-else class="px-5 py-4 text-sm text-muted">{{ t("ingest.upload.none") }}</p>
         <ul v-if="r.warnings.length" class="space-y-1 border-t border-line bg-misaligned-soft px-5 py-3">
           <li v-for="(w, k) in r.warnings" :key="k" class="flex items-start gap-2 text-xs text-misaligned">
             <TriangleAlert class="mt-0.5 size-3.5 shrink-0" /><span class="break-words">{{ w }}</span>

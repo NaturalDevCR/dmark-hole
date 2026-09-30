@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { AlertOctagon, AlertTriangle, CheckCircle2, Lightbulb } from "lucide-vue-next";
+import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import CopyButton from "@/components/ui/CopyButton.vue";
 import type { Recommendation } from "@/lib/types";
 
 defineProps<{ items: Recommendation[] }>();
-const meta = {
-  critical: { icon: AlertOctagon, cls: "text-fail bg-fail-soft", label: "Crítico" },
-  warning: { icon: AlertTriangle, cls: "text-misaligned bg-misaligned-soft", label: "Atención" },
-  info: { icon: Lightbulb, cls: "text-forwarded bg-forwarded-soft", label: "Sugerencia" },
-  success: { icon: CheckCircle2, cls: "text-pass bg-pass-soft", label: "Siguiente paso" },
-};
+const { t } = useI18n();
+const meta = computed(() => ({
+  critical: { icon: AlertOctagon, cls: "text-fail bg-fail-soft", label: t("dns.recommendations.critical") },
+  warning: { icon: AlertTriangle, cls: "text-misaligned bg-misaligned-soft", label: t("dns.recommendations.warning") },
+  info: { icon: Lightbulb, cls: "text-forwarded bg-forwarded-soft", label: t("dns.recommendations.info") },
+  success: { icon: CheckCircle2, cls: "text-pass bg-pass-soft", label: t("dns.recommendations.success") },
+}));
 </script>
 
 <template>

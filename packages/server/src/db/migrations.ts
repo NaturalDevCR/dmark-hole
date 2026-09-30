@@ -206,4 +206,12 @@ export const migrations: { version: number; sql: string }[] = [
       CREATE INDEX idx_records_day ON records(day);
     `,
   },
+  {
+    version: 3,
+    sql: `
+      -- DNS results stored before i18n have baked Spanish text and no check codes;
+      -- clearing the timestamp makes the scheduler re-check them within minutes.
+      UPDATE domains SET dns_checked_at = NULL WHERE dns_result IS NOT NULL AND dns_result NOT LIKE '%"code"%';
+    `,
+  },
 ];

@@ -24,43 +24,43 @@ const { draft, loading, error, saving, dirty, save, reset } = useSettingsDraft(
   <p v-else-if="error" class="text-sm text-fail">{{ error }}</p>
   <form v-else-if="draft" class="space-y-6" @submit.prevent="save">
     <section class="card">
-      <header class="card-header"><h3 class="card-title">Procesamiento de reportes</h3></header>
+      <header class="card-header"><h3 class="card-title">{{ $t("settings.general.processingTitle") }}</h3></header>
       <div class="card-body space-y-5">
         <Toggle
           v-model="draft.autoCreateDomains"
-          label="Crear dominios automáticamente"
-          description="Cuando llega un reporte de un dominio que todavía no está registrado, se agrega solo. Desactívelo si quiere que únicamente se acepten los dominios que usted da de alta."
+          :label="$t('settings.general.autoCreate')"
+          :description="$t('settings.general.autoCreateHint')"
         />
         <Toggle
           v-model="draft.storeRawXml"
-          label="Guardar el XML original"
-          description="Conserva una copia comprimida de cada reporte para poder descargarlo o revisarlo después. Ocupa un poco más de espacio en disco."
+          :label="$t('settings.general.storeRaw')"
+          :description="$t('settings.general.storeRawHint')"
         />
         <Toggle
           v-model="draft.enrichment"
-          label="Enriquecer las IP de origen"
-          description="Resuelve el nombre inverso (PTR), el ASN y el país de cada IP mediante consultas DNS (Team Cymru) para identificar quién envía su correo."
+          :label="$t('settings.general.enrichment')"
+          :description="$t('settings.general.enrichmentHint')"
         />
       </div>
     </section>
 
     <section class="card">
-      <header class="card-header"><h3 class="card-title">Retención y comprobaciones</h3></header>
+      <header class="card-header"><h3 class="card-title">{{ $t("settings.general.retentionTitle") }}</h3></header>
       <div class="card-body grid gap-5 sm:grid-cols-3">
         <div>
-          <label class="label" for="s-ret">Retención de reportes (días)</label>
+          <label class="label" for="s-ret">{{ $t("settings.general.retention") }}</label>
           <input id="s-ret" v-model.number="draft.retentionDays" type="number" min="0" max="3650" class="input" />
-          <p class="mt-1.5 text-xs text-muted">Los reportes agregados más antiguos se eliminan. 0 = para siempre.</p>
+          <p class="mt-1.5 text-xs text-muted">{{ $t("settings.general.retentionHint") }}</p>
         </div>
         <div>
-          <label class="label" for="s-fret">Retención de forenses (días)</label>
+          <label class="label" for="s-fret">{{ $t("settings.general.forensicRetention") }}</label>
           <input id="s-fret" v-model.number="draft.forensicRetentionDays" type="number" min="0" max="3650" class="input" />
-          <p class="mt-1.5 text-xs text-muted">Los reportes forenses pueden contener datos personales; conviene conservarlos poco. 0 = para siempre.</p>
+          <p class="mt-1.5 text-xs text-muted">{{ $t("settings.general.forensicRetentionHint") }}</p>
         </div>
         <div>
-          <label class="label" for="s-dns">Revisión DNS (cada N horas)</label>
+          <label class="label" for="s-dns">{{ $t("settings.general.dnsCheck") }}</label>
           <input id="s-dns" v-model.number="draft.dnsCheckHours" type="number" min="0" max="720" class="input" />
-          <p class="mt-1.5 text-xs text-muted">Frecuencia con la que se revisan DMARC, SPF y DKIM de cada dominio. 0 = desactivado.</p>
+          <p class="mt-1.5 text-xs text-muted">{{ $t("settings.general.dnsCheckHint") }}</p>
         </div>
       </div>
     </section>
