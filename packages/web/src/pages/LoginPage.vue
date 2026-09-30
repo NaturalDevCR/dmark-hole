@@ -29,18 +29,18 @@ async function submit() {
 </script>
 
 <template>
-  <AuthLayout title="DMARK-Hole" subtitle="Inicie sesión para ver sus reportes DMARC">
+  <AuthLayout title="DMARK-Hole" :subtitle="$t('auth.login.subtitle')">
     <form class="space-y-4" @submit.prevent="submit">
       <div>
-        <label class="label" for="email">Email</label>
+        <label class="label" for="email">{{ $t("auth.fields.email") }}</label>
         <input id="email" v-model="email" class="input" type="email" autocomplete="username" required autofocus />
       </div>
       <div>
-        <label class="label" for="password">Contraseña</label>
+        <label class="label" for="password">{{ $t("auth.fields.password") }}</label>
         <input id="password" v-model="password" class="input" type="password" autocomplete="current-password" required />
       </div>
       <p v-if="error" class="rounded-lg bg-fail-soft px-3 py-2 text-sm text-fail">{{ error }}</p>
-      <button class="btn-primary w-full" :disabled="busy"><Spinner v-if="busy" />Entrar</button>
+      <button class="btn-primary w-full" :disabled="busy"><Spinner v-if="busy" />{{ $t("auth.login.submit") }}</button>
     </form>
   </AuthLayout>
 </template>

@@ -1,3 +1,4 @@
+import { currentLocale } from "@/i18n";
 import { useToasts } from "@/stores/toasts";
 
 export class ApiError extends Error {
@@ -24,7 +25,8 @@ let onUnauthorized: (() => void) | null = null;
 export const setUnauthorizedHandler = (fn: () => void) => (onUnauthorized = fn);
 
 async function request<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
-  const init: RequestInit = { method, credentials: "same-origin", headers: {} };
+  // x-locale lets the server translate errors, DNS checks, recommendations and alerts.
+  const init: RequestInit = { method, credentials: "same-origin", headers: { "x-locale": currentLocale() } };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) {
     init.body = JSON.stringify(body);

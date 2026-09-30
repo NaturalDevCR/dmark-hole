@@ -15,7 +15,7 @@ async function copy() {
 </script>
 
 <template>
-  <button type="button" class="btn-ghost btn-sm p-1.5" title="Copiar" @click.stop="copy">
+  <button type="button" class="btn-ghost btn-sm p-1.5" :title="$t('common.actions.copy')" @click.stop="copy">
     <Check v-if="done" class="size-3.5 text-pass" />
     <Copy v-else class="size-3.5" />
   </button>

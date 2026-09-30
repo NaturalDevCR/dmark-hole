@@ -2,11 +2,11 @@ import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 
 export const RANGES = [
-  { days: 7, label: "7 días" },
-  { days: 30, label: "30 días" },
-  { days: 90, label: "90 días" },
-  { days: 180, label: "6 meses" },
-  { days: 365, label: "1 año" },
+  { days: 7, labelKey: "common.range.d7" },
+  { days: 30, labelKey: "common.range.d30" },
+  { days: 90, labelKey: "common.range.d90" },
+  { days: 180, labelKey: "common.range.d180" },
+  { days: 365, labelKey: "common.range.d365" },
 ] as const;
 
 function read<T>(key: string, fallback: T): T {

@@ -17,6 +17,7 @@ import {
 } from "lucide-vue-next";
 import { onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import LanguageSwitcher from "@/components/LanguageSwitcher.vue";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { useTheme } from "@/stores/theme";
@@ -29,14 +30,14 @@ const open = ref(false);
 const unread = ref(0);
 
 const nav = [
-  { to: "/", label: "Panel", icon: LayoutDashboard, exact: true },
-  { to: "/domains", label: "Dominios", icon: Globe },
-  { to: "/sources", label: "Fuentes", icon: Network },
-  { to: "/reports", label: "Reportes", icon: FileText },
-  { to: "/forensic", label: "Forenses", icon: ShieldAlert },
-  { to: "/alerts", label: "Alertas", icon: Bell, badge: true },
-  { to: "/ingest", label: "Ingesta", icon: Inbox },
-  { to: "/settings", label: "Configuración", icon: Settings },
+  { to: "/", key: "dashboard", icon: LayoutDashboard, exact: true },
+  { to: "/domains", key: "domains", icon: Globe },
+  { to: "/sources", key: "sources", icon: Network },
+  { to: "/reports", key: "reports", icon: FileText },
+  { to: "/forensic", key: "forensic", icon: ShieldAlert },
+  { to: "/alerts", key: "alerts", icon: Bell, badge: true },
+  { to: "/ingest", key: "ingest", icon: Inbox },
+  { to: "/settings", key: "settings", icon: Settings },
 ];
 
 const isActive = (to: string, exact?: boolean) => (exact ? route.path === to : route.path === to || route.path.startsWith(`${to}/`));
@@ -65,9 +66,9 @@ async function logout() {
   <div class="min-h-screen lg:pl-64">
     <!-- Mobile top bar -->
     <header class="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-surface/90 px-4 backdrop-blur lg:hidden">
-      <button class="btn-ghost -ml-2 p-2" aria-label="Menú" @click="open = true"><Menu class="size-5" /></button>
+      <button class="btn-ghost -ml-2 p-2" :aria-label="$t('common.nav.menu')" @click="open = true"><Menu class="size-5" /></button>
       <span class="font-semibold">DMARK-Hole</span>
-      <button class="btn-ghost -mr-2 p-2" aria-label="Tema" @click="theme.toggle()"><Sun v-if="theme.dark" class="size-5" /><Moon v-else class="size-5" /></button>
+      <button class="btn-ghost -mr-2 p-2" :aria-label="$t('common.theme.toggle')" @click="theme.toggle()"><Sun v-if="theme.dark" class="size-5" /><Moon v-else class="size-5" /></button>
     </header>
 
     <div v-if="open" class="fixed inset-0 z-40 bg-black/40 lg:hidden" @click="open = false" />
@@ -80,10 +81,10 @@ async function logout() {
           <img src="/favicon.svg" alt="" class="size-8" />
           <div class="leading-tight">
             <p class="font-semibold tracking-tight">DMARK-Hole</p>
-            <p class="text-[11px] text-faint">Análisis DMARC</p>
+            <p class="text-[11px] text-faint">{{ $t("common.appTagline") }}</p>
           </div>
         </RouterLink>
-        <button class="btn-ghost p-1.5 lg:hidden" aria-label="Cerrar menú" @click="open = false"><X class="size-4" /></button>
+        <button class="btn-ghost p-1.5 lg:hidden" :aria-label="$t('common.nav.closeMenu')" @click="open = false"><X class="size-4" /></button>
       </div>
 
       <nav class="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
@@ -95,7 +96,7 @@ async function logout() {
           :class="isActive(item.to, item.exact) ? 'bg-brand-soft text-brand' : 'text-muted hover:bg-subtle hover:text-fg'"
         >
           <component :is="item.icon" class="size-4.5" />
-          <span class="flex-1">{{ item.label }}</span>
+          <span class="flex-1">{{ $t(`common.nav.${item.key}`) }}</span>
           <span v-if="item.badge && unread" class="rounded-full bg-fail px-1.5 py-px text-[11px] font-semibold text-white tabular-nums">{{ unread > 99 ? "99+" : unread }}</span>
         </RouterLink>
       </nav>
@@ -105,14 +106,17 @@ async function logout() {
           <span class="grid size-8 shrink-0 place-items-center rounded-full bg-brand-soft text-sm font-semibold text-brand uppercase">{{ auth.user?.name?.[0] ?? "?" }}</span>
           <div class="min-w-0 flex-1 leading-tight">
             <p class="truncate text-sm font-medium">{{ auth.user?.name }}</p>
-            <p class="truncate text-xs text-faint">{{ auth.user?.role === "admin" ? "Administrador" : "Solo lectura" }}</p>
+            <p class="truncate text-xs text-faint">{{ $t(auth.user?.role === "admin" ? "common.role.admin" : "common.role.viewer") }}</p>
           </div>
-          <button class="btn-ghost hidden p-1.5 lg:inline-flex" :title="theme.dark ? 'Tema claro' : 'Tema oscuro'" @click="theme.toggle()">
+          <button class="btn-ghost hidden p-1.5 lg:inline-flex" :title="$t(theme.dark ? 'common.theme.light' : 'common.theme.dark')" @click="theme.toggle()">
             <Sun v-if="theme.dark" class="size-4" /><Moon v-else class="size-4" />
           </button>
-          <button class="btn-ghost p-1.5" title="Cerrar sesión" @click="logout"><LogOut class="size-4" /></button>
+          <button class="btn-ghost p-1.5" :title="$t('common.nav.logout')" @click="logout"><LogOut class="size-4" /></button>
         </div>
-        <p class="mt-1 px-2 text-[11px] text-faint">v{{ auth.version }}</p>
+        <div class="mt-1 flex items-center justify-between px-1">
+          <span class="px-1 text-[11px] text-faint">v{{ auth.version }}</span>
+          <LanguageSwitcher />
+        </div>
       </div>
     </aside>
 

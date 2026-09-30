@@ -10,7 +10,7 @@ const pages = computed(() => Math.max(1, Math.ceil(props.total / props.pageSize)
 
 <template>
   <div class="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm text-muted">
-    <span>{{ num(total) }} resultados</span>
+    <span>{{ $t("common.pagination.results", { count: num(total) }) }}</span>
     <div class="flex items-center gap-2">
       <button class="btn-secondary btn-sm" :disabled="page <= 1" @click="page--"><ChevronLeft class="size-4" /></button>
       <span class="tabular-nums">{{ page }} / {{ pages }}</span>

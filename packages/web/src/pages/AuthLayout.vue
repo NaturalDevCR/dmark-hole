@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LanguageSwitcher from "@/components/LanguageSwitcher.vue";
 defineProps<{ title: string; subtitle?: string }>();
 </script>
 
@@ -12,6 +13,7 @@ defineProps<{ title: string; subtitle?: string }>();
         <p v-if="subtitle" class="mt-1 text-sm text-muted">{{ subtitle }}</p>
       </div>
       <div class="card p-6"><slot /></div>
+      <div class="mt-4 flex justify-center"><LanguageSwitcher /></div>
     </div>
   </div>
 </template>

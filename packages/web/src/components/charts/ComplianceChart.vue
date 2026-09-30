@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import VChart from "vue-echarts";
+import { t as i18nT } from "@/i18n";
 import { tooltipBase, useChartTokens } from "@/lib/chart";
 import { day } from "@/lib/format";
 
@@ -37,7 +38,7 @@ const option = computed(() => {
     },
     series: [
       {
-        name: "Cumplimiento DMARC",
+        name: i18nT("common.chart.compliance"),
         type: "line",
         data: props.values,
         connectNulls: true,
@@ -62,7 +63,7 @@ const option = computed(() => {
         markLine: {
           silent: true,
           symbol: "none",
-          label: { color: t.faint, fontSize: 11, formatter: `Objetivo ${props.target}%`, position: "insideEndTop" },
+          label: { color: t.faint, fontSize: 11, formatter: i18nT("common.chart.target", { value: props.target }), position: "insideEndTop" },
           lineStyle: { color: t.faint, type: "dashed", width: 1 },
           data: [{ yAxis: props.target }],
         },

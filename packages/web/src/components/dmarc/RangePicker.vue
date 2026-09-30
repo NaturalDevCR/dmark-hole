@@ -5,7 +5,7 @@ const { days } = storeToRefs(useFilters());
 </script>
 
 <template>
-  <div class="inline-flex rounded-lg border border-line-strong bg-surface p-0.5" role="group" aria-label="Rango de fechas">
+  <div class="inline-flex rounded-lg border border-line-strong bg-surface p-0.5" role="group" :aria-label="$t('common.range.label')">
     <button
       v-for="r in RANGES"
       :key="r.days"
@@ -13,7 +13,7 @@ const { days } = storeToRefs(useFilters());
       :class="days === r.days ? 'bg-brand text-brand-fg shadow-sm' : 'text-muted hover:text-fg'"
       @click="days = r.days"
     >
-      {{ r.label }}
+      {{ $t(r.labelKey) }}
     </button>
   </div>
 </template>

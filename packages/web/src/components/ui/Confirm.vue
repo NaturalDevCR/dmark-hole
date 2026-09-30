@@ -8,8 +8,8 @@ const emit = defineEmits<{ confirm: []; close: [] }>();
   <Modal :title="title" width="sm" @close="emit('close')">
     <p class="text-sm text-muted">{{ message }}</p>
     <template #footer>
-      <button class="btn-secondary" @click="emit('close')">Cancelar</button>
-      <button :class="danger ? 'btn-danger' : 'btn-primary'" @click="emit('confirm')">{{ confirmLabel ?? "Confirmar" }}</button>
+      <button class="btn-secondary" @click="emit('close')">{{ $t("common.actions.cancel") }}</button>
+      <button :class="danger ? 'btn-danger' : 'btn-primary'" @click="emit('confirm')">{{ confirmLabel ?? $t("common.actions.confirm") }}</button>
     </template>
   </Modal>
 </template>

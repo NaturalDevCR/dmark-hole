@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { t } from "@/i18n";
 
 /** Compact "SPF pass ✓aligned" style pill used in record tables. */
 const props = defineProps<{ kind: "SPF" | "DKIM"; result: string; aligned?: boolean; domain?: string | null; selector?: string | null }>();
@@ -11,7 +12,7 @@ const tone = computed(() => {
 const title = computed(
   () =>
     `${props.kind} ${props.result}${props.domain ? ` · ${props.domain}` : ""}${props.selector ? ` (s=${props.selector})` : ""}${
-      props.result === "pass" ? (props.aligned ? " · alineado" : " · NO alineado") : ""
+      props.result === "pass" ? ` · ${props.aligned ? t("common.auth.aligned") : t("common.auth.notAligned")}` : ""
     }`,
 );
 </script>

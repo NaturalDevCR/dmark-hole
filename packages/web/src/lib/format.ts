@@ -1,17 +1,34 @@
+import { currentLocale, t } from "@/i18n";
 import type { Category, CheckStatus, SourceStatus } from "./types";
 
-const nf = new Intl.NumberFormat("es");
-const compact = new Intl.NumberFormat("es", { notation: "compact", maximumFractionDigits: 1 });
+/*
+ * All formatters read the active UI locale on every call, so they re-render
+ * correctly when the user switches language (the locale is reactive).
+ */
 
-export const num = (n: number | null | undefined) => (n === null || n === undefined ? "—" : nf.format(n));
-export const short = (n: number | null | undefined) => (n === null || n === undefined ? "—" : n < 10000 ? nf.format(n) : compact.format(n));
+const cache = new Map<string, Intl.NumberFormat>();
+function nf(opts: Intl.NumberFormatOptions = {}) {
+  const key = `${currentLocale()}|${JSON.stringify(opts)}`;
+  let f = cache.get(key);
+  if (!f) {
+    f = new Intl.NumberFormat(currentLocale(), opts);
+    cache.set(key, f);
+  }
+  return f;
+}
+
+export const num = (n: number | null | undefined) => (n === null || n === undefined ? "—" : nf().format(n));
+export const short = (n: number | null | undefined) =>
+  n === null || n === undefined ? "—" : n < 10000 ? nf().format(n) : nf({ notation: "compact", maximumFractionDigits: 1 }).format(n);
 export const pct = (n: number | null | undefined, digits = 1) =>
-  n === null || n === undefined ? "—" : `${n.toLocaleString("es", { maximumFractionDigits: digits, minimumFractionDigits: n % 1 === 0 ? 0 : Math.min(1, digits) })}%`;
+  n === null || n === undefined
+    ? "—"
+    : `${nf({ maximumFractionDigits: digits, minimumFractionDigits: n % 1 === 0 ? 0 : Math.min(1, digits) }).format(n)}%`;
 export const ratio = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : null);
 
 export function date(ts: number | null | undefined, withTime = false) {
   if (!ts) return "—";
-  return new Date(ts * 1000).toLocaleString("es", {
+  return new Date(ts * 1000).toLocaleString(currentLocale(), {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -25,23 +42,23 @@ export function date(ts: number | null | undefined, withTime = false) {
  */
 export function period(begin: number, end: number, withTime = false) {
   const opts: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric", timeZone: "UTC", ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}) };
-  const b = new Date(begin * 1000).toLocaleString("es", opts);
+  const b = new Date(begin * 1000).toLocaleString(currentLocale(), opts);
   // end_ts is inclusive (…:59:59); subtract a second so a full day stays one day.
-  const e = new Date(Math.max(begin, end - 1) * 1000).toLocaleString("es", opts);
+  const e = new Date(Math.max(begin, end - 1) * 1000).toLocaleString(currentLocale(), opts);
   return `${b === e ? b : `${b} – ${e}`}${withTime ? " UTC" : ""}`;
 }
 
 export function day(iso: string) {
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("es", { month: "short", day: "numeric", timeZone: "UTC" });
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString(currentLocale(), { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
 export function ago(ts: number | null | undefined) {
-  if (!ts) return "nunca";
+  if (!ts) return t("common.time.never");
   const s = Math.floor(Date.now() / 1000) - ts;
-  if (s < 60) return "hace un momento";
-  if (s < 3600) return `hace ${Math.floor(s / 60)} min`;
-  if (s < 86400) return `hace ${Math.floor(s / 3600)} h`;
-  if (s < 86400 * 30) return `hace ${Math.floor(s / 86400)} d`;
+  if (s < 60) return t("common.time.justNow");
+  if (s < 3600) return t("common.time.minutesAgo", { n: Math.floor(s / 60) });
+  if (s < 86400) return t("common.time.hoursAgo", { n: Math.floor(s / 3600) });
+  if (s < 86400 * 30) return t("common.time.daysAgo", { n: Math.floor(s / 86400) });
   return date(ts);
 }
 
@@ -57,22 +74,44 @@ export function bytes(n: number) {
   return `${v.toFixed(1)} ${u[i]}`;
 }
 
-export const CATEGORY: Record<Category, { label: string; hint: string; color: string }> = {
-  pass: { label: "Autenticado", hint: "Pasa DMARC con SPF o DKIM alineado", color: "var(--c-pass)" },
-  forwarded: { label: "Reenviado", hint: "Correo legítimo reenviado o de listas de correo", color: "var(--c-forwarded)" },
-  misaligned: { label: "Sin alinear", hint: "Pasa SPF/DKIM pero con otro dominio: servicio legítimo mal configurado", color: "var(--c-misaligned)" },
-  fail: { label: "No autenticado", hint: "Falla SPF y DKIM: posible suplantación", color: "var(--c-fail)" },
-};
+function category(c: Category, color: string) {
+  return {
+    get label() {
+      return t(`common.category.${c}.label`);
+    },
+    get hint() {
+      return t(`common.category.${c}.hint`);
+    },
+    color,
+  };
+}
 
-export const SOURCE_STATUS: Record<SourceStatus, { label: string; tone: Tone }> = {
-  authorized: { label: "Autorizado", tone: "pass" },
-  forwarder: { label: "Reenviador", tone: "forwarded" },
-  needs_config: { label: "Requiere configuración", tone: "misaligned" },
-  suspicious: { label: "Sospechoso", tone: "fail" },
-  mixed: { label: "Mixto", tone: "neutral" },
+/** Labels are getters so they follow the active locale. */
+export const CATEGORY: Record<Category, { readonly label: string; readonly hint: string; color: string }> = {
+  pass: category("pass", "var(--c-pass)"),
+  forwarded: category("forwarded", "var(--c-forwarded)"),
+  misaligned: category("misaligned", "var(--c-misaligned)"),
+  fail: category("fail", "var(--c-fail)"),
 };
 
 export type Tone = "pass" | "forwarded" | "misaligned" | "fail" | "neutral" | "brand";
+
+function status(s: SourceStatus, tone: Tone) {
+  return {
+    get label() {
+      return t(`common.sourceStatus.${s}`);
+    },
+    tone,
+  };
+}
+
+export const SOURCE_STATUS: Record<SourceStatus, { readonly label: string; tone: Tone }> = {
+  authorized: status("authorized", "pass"),
+  forwarder: status("forwarder", "forwarded"),
+  needs_config: status("needs_config", "misaligned"),
+  suspicious: status("suspicious", "fail"),
+  mixed: status("mixed", "neutral"),
+};
 
 export const CHECK_TONE: Record<CheckStatus, Tone> = { ok: "pass", info: "forwarded", warning: "misaligned", error: "fail" };
 
@@ -83,20 +122,21 @@ export function healthTone(score: number | null | undefined): Tone {
   return "fail";
 }
 
-export const POLICY_LABEL: Record<string, string> = { none: "Monitoreo", quarantine: "Cuarentena", reject: "Rechazo" };
+export const policyLabel = (p: string) => t(`common.policy.${p}`);
 
-const regionNames = (() => {
-  try {
-    return new Intl.DisplayNames(["es"], { type: "region" });
-  } catch {
-    return null;
-  }
-})();
-
+const regionNames = new Map<string, Intl.DisplayNames | null>();
 export function countryName(cc: string | null | undefined) {
-  if (!cc || cc === "??") return "Desconocido";
+  if (!cc || cc === "??") return t("common.unknown");
+  const loc = currentLocale();
+  if (!regionNames.has(loc)) {
+    try {
+      regionNames.set(loc, new Intl.DisplayNames([loc], { type: "region" }));
+    } catch {
+      regionNames.set(loc, null);
+    }
+  }
   try {
-    return regionNames?.of(cc.toUpperCase()) ?? cc;
+    return regionNames.get(loc)?.of(cc.toUpperCase()) ?? cc;
   } catch {
     return cc;
   }

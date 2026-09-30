@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import VChart from "vue-echarts";
+import { t as i18nT } from "@/i18n";
 import { tooltipBase, useChartTokens } from "@/lib/chart";
 import { CATEGORY, day, num } from "@/lib/format";
 import type { Category, Timeseries } from "@/lib/types";
@@ -40,7 +41,7 @@ const option = computed(() => {
           )
           .join("");
         const c = props.data.series.compliance[i];
-        return `<div style="min-width:180px"><div style="margin-bottom:6px;font-weight:600">${day(props.data.days[i]!)}</div>${rows}<div style="border-top:1px solid ${t.line};margin-top:6px;padding-top:6px;display:flex;justify-content:space-between"><span>Total</span><b>${num(total)}</b></div><div style="display:flex;justify-content:space-between;color:${t.muted}"><span>Cumplimiento DMARC</span><span>${c === null || c === undefined ? "—" : c + "%"}</span></div></div>`;
+        return `<div style="min-width:180px"><div style="margin-bottom:6px;font-weight:600">${day(props.data.days[i]!)}</div>${rows}<div style="border-top:1px solid ${t.line};margin-top:6px;padding-top:6px;display:flex;justify-content:space-between"><span>${i18nT("common.chart.total")}</span><b>${num(total)}</b></div><div style="display:flex;justify-content:space-between;color:${t.muted}"><span>${i18nT("common.chart.compliance")}</span><span>${c === null || c === undefined ? "—" : c + "%"}</span></div></div>`;
       },
     },
     xAxis: {

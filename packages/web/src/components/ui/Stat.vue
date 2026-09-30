@@ -44,7 +44,7 @@ const toneBg: Record<string, string> = {
       >
         <TrendingUp v-if="delta > 0" class="size-3.5" />
         <TrendingDown v-else-if="delta < 0" class="size-3.5" />
-        {{ delta > 0 ? "+" : "" }}{{ delta.toLocaleString("es", { maximumFractionDigits: 1 }) }}{{ deltaSuffix ?? "%" }}
+        {{ delta > 0 ? "+" : "" }}{{ delta.toLocaleString($i18n.locale, { maximumFractionDigits: 1 }) }}{{ deltaSuffix ?? "%" }}
       </span>
       <span v-if="hint" class="truncate text-muted">{{ hint }}</span>
     </div>
