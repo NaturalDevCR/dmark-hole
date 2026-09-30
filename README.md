@@ -27,7 +27,7 @@ The web UI is available in **English and Spanish**. The language is detected aut
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main/deploy/proxmox/dmark-hole-lxc.sh)"
 ```
 
-It creates an unprivileged Debian 12 (or 13) container, installs DMARK-Hole as a service and prints the URL when done (`http://<container-ip>:8080`). Open that URL and create the administrator account.
+It creates an unprivileged Debian 13 container (Debian 12 on older Proxmox releases), installs DMARK-Hole as a service and prints the URL when done (`http://<container-ip>:8080`). Open that URL and create the administrator account.
 
 **Docker:**
 
@@ -58,9 +58,9 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/
 What it does, step by step:
 
 1. Checks that it is running on a Proxmox host (`pct`, `pveam`).
-2. Asks for the ID, hostname, storage, bridge, CPU/RAM/disk and IP (press Enter to accept a default).
-3. Downloads the Debian template (12 by default) if it is not already present.
-4. Creates an **unprivileged** container with `nesting=1` and start-on-boot, then starts it.
+2. Asks for the ID, hostname, storage, bridge, CPU/RAM/disk, IP and an optional root password (press Enter to accept a default).
+3. Downloads the Debian 13 template if it is not already present (falls back to Debian 12 when the Proxmox version doesn't offer 13).
+4. Creates an **unprivileged** container with `nesting=1` and start-on-boot, starts it, and either sets the root password you typed or, if you left it empty, enables root auto-login on the Proxmox console.
 5. Runs `deploy/install.sh` inside the container: installs Node 24, clones this repository into `/opt/dmark-hole`, builds it and registers the `dmark-hole` systemd service.
 6. Prints the IP and the URL.
 
@@ -82,8 +82,23 @@ CTID=150 CT_HOSTNAME=dmarc STORAGE=local-lvm BRIDGE=vmbr0 IP=192.168.1.50/24 GAT
 | `BRIDGE` / `VLAN` | `vmbr0` / none | Network |
 | `CORES` / `RAM` / `DISK` | `1` / `1024` (MB) / `4` (GB) | Resources |
 | `IP` / `GATEWAY` / `DNS` | `dhcp` | IP in CIDR notation and gateway when static |
-| `DEBIAN_VERSION` | `12` | `12` or `13` |
+| `DEBIAN_VERSION` | `13` | `13` or `12` |
+| `ROOT_PASSWORD` | empty | Container root password; empty = console auto-login as root |
 | `REPO_URL` / `REPO_BRANCH` | this repository / `main` | Install from a fork or a branch |
+
+#### Accessing the container
+
+DMARK-Hole itself is used from the browser (`http://<container-ip>:8080`); the container console is only needed for administration:
+
+- From the Proxmox host shell: `pct enter <CTID>` (no password needed).
+- From the Proxmox web UI: **Console** tab of the container. If you left the root password empty during install, it logs you in automatically.
+- Set or change the root password at any time: `pct exec <CTID> -- passwd`.
+
+Containers created with an earlier version of the script have no root password and no auto-login. Either set a password with the command above, or enable console auto-login from the Proxmox host:
+
+```bash
+pct exec <CTID> -- bash -c 'mkdir -p /etc/systemd/system/container-getty@1.service.d && printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear --keep-baud tty%%I 115200,38400,9600 \$TERM\n" > /etc/systemd/system/container-getty@1.service.d/override.conf && systemctl daemon-reload && systemctl restart container-getty@1.service'
+```
 
 No GitHub access from the container? Copy the whole repository to the host and run the script from there. It packages the local code and pushes it into the container:
 

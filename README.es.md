@@ -27,7 +27,7 @@ La interfaz está disponible en **inglés y español**: se detecta automáticame
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main/deploy/proxmox/dmark-hole-lxc.sh)"
 ```
 
-Crea un contenedor Debian 12 (o 13) sin privilegios, instala DMARK-Hole como servicio y al final muestra la URL (`http://<ip-del-contenedor>:8080`). Abra esa URL y cree la cuenta de administrador.
+Crea un contenedor Debian 13 sin privilegios (Debian 12 en versiones antiguas de Proxmox), instala DMARK-Hole como servicio y al final muestra la URL (`http://<ip-del-contenedor>:8080`). Abra esa URL y cree la cuenta de administrador.
 
 **Docker:**
 
@@ -58,9 +58,9 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/
 Qué hace, paso a paso:
 
 1. Verifica que es un host Proxmox (`pct`, `pveam`).
-2. Pregunta ID, nombre, almacenamiento, bridge, CPU/RAM/disco e IP (Enter acepta el valor por defecto).
-3. Descarga la plantilla Debian (12 por defecto) si no existe.
-4. Crea un contenedor **sin privilegios** con `nesting=1` e inicio automático, y lo arranca.
+2. Pregunta ID, nombre, almacenamiento, bridge, CPU/RAM/disco, IP y una contraseña de root opcional (Enter acepta el valor por defecto).
+3. Descarga la plantilla Debian 13 si no existe (usa Debian 12 si su versión de Proxmox no ofrece la 13).
+4. Crea un contenedor **sin privilegios** con `nesting=1` e inicio automático, lo arranca y fija la contraseña de root indicada o, si la dejó vacía, activa el inicio de sesión automático de root en la consola de Proxmox.
 5. Dentro del contenedor ejecuta `deploy/install.sh`: instala Node 24, clona este repositorio en `/opt/dmark-hole`, compila y registra el servicio systemd `dmark-hole`.
 6. Imprime la IP y la URL.
 
@@ -82,8 +82,23 @@ CTID=150 CT_HOSTNAME=dmarc STORAGE=local-lvm BRIDGE=vmbr0 IP=192.168.1.50/24 GAT
 | `BRIDGE` / `VLAN` | `vmbr0` / ninguna | Red |
 | `CORES` / `RAM` / `DISK` | `1` / `1024` (MB) / `4` (GB) | Recursos |
 | `IP` / `GATEWAY` / `DNS` | `dhcp` | IP en formato CIDR y puerta de enlace si es estática |
-| `DEBIAN_VERSION` | `12` | `12` o `13` |
+| `DEBIAN_VERSION` | `13` | `13` o `12` |
+| `ROOT_PASSWORD` | vacío | Contraseña de root del contenedor; vacío = inicio de sesión automático en la consola |
 | `REPO_URL` / `REPO_BRANCH` | este repositorio / `main` | Para instalar desde un fork o una rama |
+
+#### Acceso al contenedor
+
+DMARK-Hole se usa desde el navegador (`http://<ip-del-contenedor>:8080`); la consola del contenedor solo hace falta para administrarlo:
+
+- Desde la shell del host Proxmox: `pct enter <CTID>` (sin contraseña).
+- Desde la interfaz web de Proxmox: pestaña **Console** del contenedor. Si dejó vacía la contraseña de root durante la instalación, entra automáticamente.
+- Para fijar o cambiar la contraseña de root: `pct exec <CTID> -- passwd`.
+
+Los contenedores creados con una versión anterior del script no tienen contraseña de root ni inicio automático. Fije una contraseña con el comando anterior o active el inicio automático en la consola desde el host Proxmox:
+
+```bash
+pct exec <CTID> -- bash -c 'mkdir -p /etc/systemd/system/container-getty@1.service.d && printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear --keep-baud tty%%I 115200,38400,9600 \$TERM\n" > /etc/systemd/system/container-getty@1.service.d/override.conf && systemctl daemon-reload && systemctl restart container-getty@1.service'
+```
 
 ¿Sin acceso a GitHub desde el contenedor? Copie el repositorio completo al host y ejecute el script desde ahí; empaqueta el código local y lo sube al contenedor:
 

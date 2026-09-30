@@ -18,7 +18,8 @@
 #   IP                dhcp or CIDR, e.g. 192.168.1.50/24  (dhcp)
 #   GATEWAY           gateway when IP is static
 #   DNS               optional nameserver
-#   DEBIAN_VERSION    12 or 13                          (12)
+#   DEBIAN_VERSION    13 or 12                          (13; falls back to 12 if no 13 template)
+#   ROOT_PASSWORD     root password for the console     (empty: console auto-login as root)
 #   REPO_URL          git repo cloned inside the container
 #   REPO_BRANCH       optional branch
 #   REPO_RAW_URL      raw base URL used to fetch install.sh if not next to this script
@@ -93,7 +94,8 @@ DEFAULT_TSTORAGE="$(first_storage vztmpl local)"
 CTID="${CTID:-}"; STORAGE="${STORAGE:-}"; TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-}"
 BRIDGE="${BRIDGE:-}"; CORES="${CORES:-}"; RAM="${RAM:-}"; DISK="${DISK:-}"
 IP="${IP:-}"; GATEWAY="${GATEWAY:-}"; VLAN="${VLAN:-}"; DNS="${DNS:-}"
-DEBIAN_VERSION="${DEBIAN_VERSION:-12}"
+DEBIAN_VERSION="${DEBIAN_VERSION:-13}"
+ROOT_PASSWORD="${ROOT_PASSWORD:-}"
 
 ask CTID             "Container ID"                 "$DEFAULT_CTID"
 ask CT_HOSTNAME      "Hostname"                     "dmark-hole"
@@ -107,6 +109,15 @@ ask IP               "IPv4 address (dhcp or CIDR)"  "dhcp"
 if [[ "$IP" != "dhcp" ]]; then
   ask GATEWAY        "Gateway"                      ""
   [[ -n "$GATEWAY" ]] || die "A static IP needs GATEWAY."
+fi
+if [[ -z "$ROOT_PASSWORD" && $INTERACTIVE -eq 1 ]]; then
+  # Silent prompt; empty keeps the Proxmox console logged in as root automatically.
+  if [[ -r /dev/tty ]]; then
+    read -r -s -p "Root password for the container (empty = console auto-login): " ROOT_PASSWORD < /dev/tty || true
+  else
+    read -r -s -p "Root password for the container (empty = console auto-login): " ROOT_PASSWORD || true
+  fi
+  echo
 fi
 
 [[ "$CTID" =~ ^[0-9]+$ && "$CTID" -ge 100 ]] || die "Invalid CTID: $CTID"
@@ -124,9 +135,18 @@ info "CT $CTID '$CT_HOSTNAME' | ${CORES} cores, ${RAM} MB RAM, ${DISK} GB on ${S
 # --- template ------------------------------------------------------------------------
 step "Preparing Debian ${DEBIAN_VERSION} template"
 pveam update >/dev/null || warn "pveam update failed; using cached template list"
-TEMPLATE="$(pveam available --section system | awk '{print $2}' \
-  | grep -E "^debian-${DEBIAN_VERSION}-standard_.*_amd64\.tar\.(zst|gz|xz)$" | sort -V | tail -n1 || true)"
-[[ -n "$TEMPLATE" ]] || die "No debian-${DEBIAN_VERSION}-standard template available (try DEBIAN_VERSION=12/13)."
+find_template() {
+  pveam available --section system | awk '{print $2}' \
+    | grep -E "^debian-$1-standard_.*_amd64\.tar\.(zst|gz|xz)$" | sort -V | tail -n1 || true
+}
+TEMPLATE="$(find_template "$DEBIAN_VERSION")"
+if [[ -z "$TEMPLATE" && "$DEBIAN_VERSION" == "13" ]]; then
+  # Older Proxmox releases only ship Debian 12 templates.
+  warn "No Debian 13 template offered by this Proxmox version; using Debian 12."
+  DEBIAN_VERSION=12
+  TEMPLATE="$(find_template 12)"
+fi
+[[ -n "$TEMPLATE" ]] || die "No debian-${DEBIAN_VERSION}-standard template available."
 if pveam list "$TEMPLATE_STORAGE" | awk '{print $1}' | grep -q "/${TEMPLATE}\$"; then
   info "Template already downloaded: $TEMPLATE"
 else
@@ -177,6 +197,22 @@ done
 [[ $ONLINE -eq 1 ]] || die "Container has no working DNS/Internet access (IP: $CT_IP). Check bridge, gateway and DNS."
 info "Container IP: $CT_IP"
 
+# --- console access -----------------------------------------------------------------------
+step "Configuring console access"
+if [[ -n "$ROOT_PASSWORD" ]]; then
+  # Via stdin so the password never shows up in the host's process list.
+  printf 'root:%s\n' "$ROOT_PASSWORD" | pct exec "$CTID" -- chpasswd
+  info "Root password set."
+else
+  # Same approach as the community Proxmox helper scripts: the console is only
+  # reachable through the (authenticated) Proxmox UI or `pct console`.
+  # shellcheck disable=SC2016  # expanded inside the container, not here
+  pct exec "$CTID" -- bash -c 'mkdir -p /etc/systemd/system/container-getty@1.service.d
+printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear --keep-baud tty%%I 115200,38400,9600 \$TERM\n" > /etc/systemd/system/container-getty@1.service.d/override.conf
+systemctl daemon-reload && systemctl restart container-getty@1.service'
+  info "Console auto-login enabled (no root password). Set one later with: pct exec $CTID -- passwd"
+fi
+
 # --- install ------------------------------------------------------------------------------
 step "Installing DMARK-Hole inside the container"
 SELF="${BASH_SOURCE[0]:-}"
@@ -212,6 +248,6 @@ echo
 echo "${C_G}DMARK-Hole is ready.${C_0}"
 echo "  Container: $CTID ($CT_HOSTNAME)"
 echo "  URL:       http://${CT_IP}:${PORT}"
-echo "  Shell:     pct enter $CTID"
+echo "  Shell:     pct enter $CTID   (or the Console tab in the Proxmox UI)"
 echo "  Update:    pct exec $CTID -- /opt/dmark-hole/deploy/install.sh --update"
 echo "  Config:    /etc/dmark-hole/dmark-hole.env (inside the container)"
