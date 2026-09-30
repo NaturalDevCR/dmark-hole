@@ -1,0 +1,47 @@
+[Unit]
+Description=DMARK-Hole DMARC report receiver and analyzer
+Documentation=https://github.com/CHANGE_ME/dmark-hole
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dmark
+Group=dmark
+WorkingDirectory=/opt/dmark-hole
+EnvironmentFile=/etc/dmark-hole/dmark-hole.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node packages/server/dist/index.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+# Directory for the SQLite database and generated secret (/var/lib/dmark-hole).
+StateDirectory=dmark-hole
+StateDirectoryMode=0750
+
+# --- Hardening ---------------------------------------------------------------
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/dmark-hole
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+# Allow binding privileged ports (e.g. SMTP_PORT=25) as an unprivileged user.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+# Note: MemoryDenyWriteExecute is intentionally not set (V8 JIT needs W+X).
+
+[Install]
+WantedBy=multi-user.target

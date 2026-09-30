@@ -1,88 +1,43 @@
-version: "3.9"
-
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-dmark}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dmark}
-      POSTGRES_DB: ${POSTGRES_DB:-dmark_hole}
+  dmark-hole:
+    build: .
+    image: dmark-hole:latest
+    container_name: dmark-hole
+    restart: unless-stopped
+    init: true
     ports:
-      - "5432:5432"
+      # Web UI + API
+      - "8080:8080"
+      # Built-in SMTP receiver for rua/ruf reports. Only needed when
+      # SMTP_ENABLED=true (or enabled from the UI). The container listens on
+      # 2525 (unprivileged); to receive real mail map it to host port 25:
+      #   - "25:2525"
+      - "2525:2525"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dmark -d dmark_hole"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redisdata:/data
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile.api
-    ports:
-      - "3001:3001"
+      # SQLite database + auto-generated secret live here. Back this up.
+      - dmark-data:/data
     environment:
-      DATABASE_URL: postgresql://dmark:dmark@postgres:5432/dmark_hole?schema=public
-      REDIS_URL: redis://redis:6379/0
-      LOG_LEVEL: debug
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./packages/api/src:/app/packages/api/src
-      - ./packages/shared/src:/app/packages/shared/src
-      - ./packages/db/prisma:/app/packages/db/prisma
+      LOG_LEVEL: info
+      # Set to true when serving over HTTPS (behind a reverse proxy).
+      SECURE_COOKIES: "false"
+      # Set to true when behind a reverse proxy (X-Forwarded-* headers).
+      TRUST_PROXY: "false"
+      # Built-in SMTP receiver (can also be toggled in the UI).
+      SMTP_ENABLED: "false"
+      # Optional: fixed secret (>= 32 chars). If unset, one is generated in /data.
+      # SECRET_KEY: "change-me-to-a-random-string-of-at-least-32-chars"
+      # Optional: bootstrap admin. If unset, use the first-run setup page.
+      # ADMIN_EMAIL: "admin@example.com"
+      # ADMIN_PASSWORD: "change-me"
 
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-    environment:
-      DATABASE_URL: postgresql://dmark:dmark@postgres:5432/dmark_hole?schema=public
-      REDIS_URL: redis://redis:6379/0
-      LOG_LEVEL: debug
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./packages/queue/src:/app/packages/queue/src
-      - ./packages/shared/src:/app/packages/shared/src
-      - ./packages/db/prisma:/app/packages/db/prisma
-    deploy:
-      replicas: 2
-
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
-    ports:
-      - "5173:5173"
-    environment:
-      VITE_API_URL: http://localhost:3001
-    depends_on:
-      - api
-    volumes:
-      - ./packages/web/src:/app/packages/web/src
+    # --- Optional: Traefik labels for HTTPS (uncomment and adapt) -----------
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.dmark.rule=Host(`dmarc.example.com`)
+    #   - traefik.http.routers.dmark.tls.certresolver=letsencrypt
+    #   - traefik.http.services.dmark.loadbalancer.server.port=8080
+    # With Caddy instead: `dmarc.example.com { reverse_proxy dmark-hole:8080 }`
+    # Remember TRUST_PROXY=true and SECURE_COOKIES=true when doing so.
 
 volumes:
-  pgdata:
-  redisdata:
+  dmark-data:

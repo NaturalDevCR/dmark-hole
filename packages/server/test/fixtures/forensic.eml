@@ -1,0 +1,48 @@
+Return-Path: <>
+Received: from mx.example.net (mx.example.net [198.51.100.25])
+	by mail.example.com (Postfix) with ESMTPS id 4F1234567
+	for <postmaster@example.com>; Tue, 30 Sep 2025 10:15:02 +0000 (UTC)
+From: DMARC Reports <dmarc-noreply@example.net>
+To: postmaster@example.com
+Subject: DMARC failure report for example.com
+Message-ID: <20250930101502.4F1234567@mx.example.net>
+Date: Tue, 30 Sep 2025 10:15:02 +0000
+MIME-Version: 1.0
+Content-Type: multipart/report; report-type=feedback-report;
+	boundary="=_boundary_arf_1234"
+
+--=_boundary_arf_1234
+Content-Type: text/plain; charset="US-ASCII"
+Content-Transfer-Encoding: 7bit
+
+This is an authentication failure report for an email message received from
+IP 203.0.113.77 on Tue, 30 Sep 2025 10:15:00 +0000.
+The message below did not meet the sending domain's DMARC policy.
+
+--=_boundary_arf_1234
+Content-Type: message/feedback-report
+
+Feedback-Type: auth-failure
+User-Agent: ExampleReceiver/1.0
+Version: 1
+Original-Mail-From: <bounce@example.com>
+Original-Rcpt-To: <victim@example.net>
+Arrival-Date: Tue, 30 Sep 2025 10:15:00 +0000
+Source-IP: 203.0.113.77
+Reported-Domain: example.com
+Auth-Failure: dmarc
+Delivery-Result: reject
+DKIM-Domain: example.com
+DKIM-Selector: s1
+Identity-Alignment: dkim, spf
+
+--=_boundary_arf_1234
+Content-Type: text/rfc822-headers
+
+From: someone@example.com
+To: victim@example.net
+Subject: Urgent: verify your account
+Message-ID: <spoofed-123@example.com>
+Date: Tue, 30 Sep 2025 10:14:55 +0000
+
+--=_boundary_arf_1234--
