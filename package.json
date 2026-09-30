@@ -1,0 +1,35 @@
+{
+  "name": "dmark-hole",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enterprise DMARC, SPF & DKIM email authentication monitoring platform",
+  "workspaces": [
+    "packages/shared",
+    "packages/db",
+    "packages/api",
+    "packages/queue",
+    "packages/web"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "db:migrate": "npm run migrate -w packages/db",
+    "db:generate": "npm run generate -w packages/db",
+    "db:studio": "npm run studio -w packages/db",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "clean": "turbo clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.0",
+    "prettier": "^3.3.0",
+    "eslint": "^9.12.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

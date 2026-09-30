@@ -1,0 +1,88 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dmark}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dmark}
+      POSTGRES_DB: ${POSTGRES_DB:-dmark_hole}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dmark -d dmark_hole"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://dmark:dmark@postgres:5432/dmark_hole?schema=public
+      REDIS_URL: redis://redis:6379/0
+      LOG_LEVEL: debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./packages/api/src:/app/packages/api/src
+      - ./packages/shared/src:/app/packages/shared/src
+      - ./packages/db/prisma:/app/packages/db/prisma
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      DATABASE_URL: postgresql://dmark:dmark@postgres:5432/dmark_hole?schema=public
+      REDIS_URL: redis://redis:6379/0
+      LOG_LEVEL: debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./packages/queue/src:/app/packages/queue/src
+      - ./packages/shared/src:/app/packages/shared/src
+      - ./packages/db/prisma:/app/packages/db/prisma
+    deploy:
+      replicas: 2
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:3001
+    depends_on:
+      - api
+    volumes:
+      - ./packages/web/src:/app/packages/web/src
+
+volumes:
+  pgdata:
+  redisdata:

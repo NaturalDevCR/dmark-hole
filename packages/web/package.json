@@ -1,0 +1,43 @@
+{
+  "name": "@dmark-hole/web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@dmark-hole/shared": "workspace:*",
+    "vue": "^3.5.12",
+    "vue-router": "^4.4.5",
+    "pinia": "^2.2.6",
+    "@vueuse/core": "^11.2.0",
+    "@vueuse/router": "^11.2.0",
+    "radix-vue": "^1.9.6",
+    "tailwindcss": "^3.4.14",
+    "postcss": "^8.4.47",
+    "autoprefixer": "^10.4.20",
+    "lucide-vue-next": "^0.453.0",
+    "echarts": "^5.5.1",
+    "vue-echarts": "^7.0.3",
+    "date-fns": "^4.1.0",
+    "@vee-validate/zod": "^4.14.7",
+    "vee-validate": "^4.14.7",
+    "clsx": "^2.1.1",
+    "class-variance-authority": "^0.7.0",
+    "tailwind-merge": "^2.5.4",
+    "tailwindcss-animate": "^1.0.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.1.4",
+    "vite": "^5.4.10",
+    "vue-tsc": "^2.1.10",
+    "typescript": "^5.6.0",
+    "unplugin-auto-import": "^0.18.3",
+    "unplugin-vue-components": "^0.27.4"
+  }
+}

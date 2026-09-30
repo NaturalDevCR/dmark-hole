@@ -1,0 +1,45 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+.turbo/
+
+# Build outputs
+dist/
+.next/
+.nuxt/
+.output/
+
+# Database
+*.db
+*.db-journal
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Test coverage
+coverage/
+
+# Prisma
+packages/db/prisma/*.db
+
+# Docker
+docker-data/
+
+# Temp
+tmp/
+temp/
