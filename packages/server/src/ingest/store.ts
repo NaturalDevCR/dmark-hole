@@ -43,7 +43,7 @@ export function resolveDomain(name: string): { id: number; name: string } | null
   if (exact) return exact;
   const settings = getSettings();
   const org = orgDomain(name);
-  if (!settings.autoCreateDomains && org !== name) {
+  if (org !== name) {
     const parent = db.get<{ id: number; name: string }>("SELECT id, name FROM domains WHERE name = ?", [org]);
     if (parent) return parent;
   }

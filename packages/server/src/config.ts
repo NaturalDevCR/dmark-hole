@@ -53,6 +53,8 @@ export const config = {
     maxSize: envInt("SMTP_MAX_SIZE_MB", 25) * 1024 * 1024,
     tlsKey: process.env.SMTP_TLS_KEY,
     tlsCert: process.env.SMTP_TLS_CERT,
+    /** Default RCPT TO allow-list (comma separated) used until one is set in the UI. */
+    allowedRecipients: (process.env.SMTP_ALLOWED_RECIPIENTS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
   },
   bootstrapAdmin: {
     email: process.env.ADMIN_EMAIL,

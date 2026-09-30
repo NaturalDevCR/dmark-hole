@@ -109,7 +109,7 @@ export function enqueueIps(ips: string[]) {
 export function enrichBacklog() {
   const rows = db.all<{ source_ip: string }>(
     `SELECT DISTINCT r.source_ip FROM records r LEFT JOIN ip_info i ON i.ip = r.source_ip
-     WHERE i.ip IS NULL OR i.updated_at < ? LIMIT 2000`,
+     WHERE i.ip IS NULL OR i.updated_at < ? ORDER BY r.source_ip LIMIT 2000`,
     [nowSec() - REFRESH_AFTER],
   );
   enqueueIps(rows.map((r) => r.source_ip));

@@ -170,6 +170,14 @@ function sourceStatus(s: Pick<SourceRow, "messages" | "pass" | "forwarded" | "mi
   return "mixed";
 }
 
+/** SQL twin of sourceStatus(), evaluated over the aggregated columns of a GROUP BY source_ip. */
+const STATUS_SQL = `CASE
+  WHEN pass >= 0.9 * messages THEN 'authorized'
+  WHEN pass + forwarded >= 0.9 * messages AND forwarded > 0 THEN 'forwarder'
+  WHEN misaligned >= 0.5 * messages THEN 'needs_config'
+  WHEN fail >= 0.5 * messages THEN 'suspicious'
+  ELSE 'mixed' END`;
+
 export function sources(f: Filter & { category?: string; search?: string; limit?: number }): SourceRow[] {
   const w = where(f);
   const extra: string[] = [];
@@ -178,6 +186,15 @@ export function sources(f: Filter & { category?: string; search?: string; limit?
     extra.push("(r.source_ip LIKE ? OR i.ptr LIKE ? OR i.provider LIKE ? OR i.as_name LIKE ?)");
     const s = `%${f.search}%`;
     params.push(s, s, s, s);
+  }
+  // Filter in SQL (before LIMIT) so low-volume sources are not cut off.
+  let having = "";
+  const havingParams: string[] = [];
+  if (f.category && ["pass", "forwarded", "misaligned", "fail"].includes(f.category)) {
+    having = `HAVING ${f.category} > 0`;
+  } else if (f.category) {
+    having = `HAVING ${STATUS_SQL} = ?`;
+    havingParams.push(f.category);
   }
   const rows = db.all<{
     ip: string;
@@ -214,9 +231,10 @@ export function sources(f: Filter & { category?: string; search?: string; limit?
      FROM records r LEFT JOIN ip_info i ON i.ip = r.source_ip
      WHERE ${w.sql} ${extra.length ? `AND ${extra.join(" AND ")}` : ""}
      GROUP BY r.source_ip
+     ${having}
      ORDER BY messages DESC
      LIMIT ?`,
-    [...params, f.limit ?? 1000],
+    [...params, ...havingParams, f.limit ?? 1000],
   );
 
   // Auth domains per IP (bounded sample so large installs stay fast).
@@ -237,7 +255,7 @@ export function sources(f: Filter & { category?: string; search?: string; limit?
     }
   }
 
-  let out: SourceRow[] = rows.map((r) => {
+  const out: SourceRow[] = rows.map((r) => {
     const base = {
       ip: r.ip,
       ptr: r.ptr,
@@ -261,24 +279,35 @@ export function sources(f: Filter & { category?: string; search?: string; limit?
     };
     return { ...base, status: sourceStatus(base) };
   });
-  if (f.category) out = out.filter((s) => (s as unknown as Record<string, number>)[f.category!]! > 0 || s.status === f.category);
   return out;
 }
 
-/** Sources grouped by detected provider (or ASN when unknown). */
+/** Sources grouped by detected provider (or ASN when unknown), aggregated in SQL. */
 export function providers(f: Filter) {
-  const list = sources({ ...f, limit: 5000 });
+  const w = where(f);
+  const rows = db.all<{ name: string; ips: number; messages: number; pass: number; forwarded: number; misaligned: number; fail: number; countries: string | null }>(
+    `SELECT COALESCE(i.provider, i.as_name, 'Desconocido') name, COUNT(DISTINCT r.source_ip) ips, SUM(r.count) messages,
+       SUM(CASE WHEN r.category = 'pass' THEN r.count ELSE 0 END) pass,
+       SUM(CASE WHEN r.category = 'forwarded' THEN r.count ELSE 0 END) forwarded,
+       SUM(CASE WHEN r.category = 'misaligned' THEN r.count ELSE 0 END) misaligned,
+       SUM(CASE WHEN r.category = 'fail' THEN r.count ELSE 0 END) fail,
+       GROUP_CONCAT(DISTINCT i.country) countries
+     FROM records r LEFT JOIN ip_info i ON i.ip = r.source_ip
+     WHERE ${w.sql} GROUP BY 1`,
+    w.params,
+  );
+  // ASN names look like "GOOGLE - Google LLC, US"; drop the trailing country so variants merge.
   const groups = new Map<string, { name: string; ips: number; messages: number; pass: number; forwarded: number; misaligned: number; fail: number; countries: Set<string> }>();
-  for (const s of list) {
-    const name = s.provider ?? (s.asName ? s.asName.replace(/,\s*[A-Z]{2}$/, "") : "Desconocido");
+  for (const r of rows) {
+    const name = r.name.replace(/,\s*[A-Z]{2}$/, "");
     const g = groups.get(name) ?? { name, ips: 0, messages: 0, pass: 0, forwarded: 0, misaligned: 0, fail: 0, countries: new Set<string>() };
-    g.ips++;
-    g.messages += s.messages;
-    g.pass += s.pass;
-    g.forwarded += s.forwarded;
-    g.misaligned += s.misaligned;
-    g.fail += s.fail;
-    if (s.country) g.countries.add(s.country);
+    g.ips += r.ips;
+    g.messages += r.messages;
+    g.pass += r.pass;
+    g.forwarded += r.forwarded;
+    g.misaligned += r.misaligned;
+    g.fail += r.fail;
+    for (const c of (r.countries ?? "").split(",")) if (c) g.countries.add(c);
     groups.set(name, g);
   }
   return [...groups.values()]

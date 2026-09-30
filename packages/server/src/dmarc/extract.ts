@@ -1,10 +1,15 @@
-import { gunzipSync, unzipSync } from "fflate";
+import { gunzipSync } from "node:zlib";
+import { unzipSync } from "fflate";
 import { simpleParser, type ParsedMail } from "mailparser";
 import { looksLikeAggregate } from "./aggregate.js";
 import type { ExtractedDocument, ForensicReport } from "./types.js";
 
 const MAX_DEPTH = 4;
-const MAX_UNCOMPRESSED = 200 * 1024 * 1024;
+/**
+ * Decompression budget shared by every nested archive in one blob. Real aggregate
+ * reports are at most a few MB; this only has to stop compression bombs.
+ */
+const MAX_UNCOMPRESSED = 64 * 1024 * 1024;
 
 export interface ExtractResult {
   documents: ExtractedDocument[];
@@ -41,7 +46,7 @@ function looksLikeEmail(text: string): boolean {
  * .eml with attachments, nested combinations) and returns the DMARC documents
  * it contains.
  */
-export async function extractDocuments(data: Uint8Array, name = "upload", depth = 0): Promise<ExtractResult> {
+export async function extractDocuments(data: Uint8Array, name = "upload", depth = 0, budget = { left: MAX_UNCOMPRESSED }): Promise<ExtractResult> {
   const out: ExtractResult = { documents: [], warnings: [] };
   if (depth > MAX_DEPTH) {
     out.warnings.push(`${name}: nesting too deep`);
@@ -50,20 +55,22 @@ export async function extractDocuments(data: Uint8Array, name = "upload", depth 
 
   try {
     if (isGzip(data)) {
-      const inner = gunzipSync(data);
-      if (inner.length > MAX_UNCOMPRESSED) throw new Error("decompressed size exceeds limit");
-      return merge(out, await extractDocuments(inner, name.replace(/\.gz$/i, ""), depth + 1));
+      // maxOutputLength aborts inflation early instead of allocating the whole bomb.
+      const inner = gunzipSync(data, { maxOutputLength: Math.max(1, budget.left) });
+      budget.left -= inner.length;
+      return merge(out, await extractDocuments(inner, name.replace(/\.gz$/i, ""), depth + 1, budget));
     }
     if (isZip(data)) {
-      let total = 0;
+      // fflate caps each entry at its declared size, so budgeting declared sizes is enough.
       const files = unzipSync(data, {
         filter: (f) => {
-          total += f.originalSize;
-          return !f.name.endsWith("/") && total <= MAX_UNCOMPRESSED;
+          if (f.name.endsWith("/") || f.originalSize > budget.left) return false;
+          budget.left -= f.originalSize;
+          return true;
         },
       });
       for (const [fname, content] of Object.entries(files)) {
-        merge(out, await extractDocuments(content, fname, depth + 1));
+        merge(out, await extractDocuments(content, fname, depth + 1, budget));
       }
       return out;
     }
@@ -79,7 +86,7 @@ export async function extractDocuments(data: Uint8Array, name = "upload", depth 
     return out;
   }
   if (looksLikeEmail(text)) {
-    return merge(out, await extractFromEmail(data, name, depth));
+    return merge(out, await extractFromEmail(data, name, depth, budget));
   }
   out.warnings.push(`${name}: unsupported content`);
   return out;
@@ -93,7 +100,7 @@ function merge(target: ExtractResult, src: ExtractResult): ExtractResult {
   return target;
 }
 
-async function extractFromEmail(data: Uint8Array, name: string, depth: number): Promise<ExtractResult> {
+async function extractFromEmail(data: Uint8Array, name: string, depth: number, budget: { left: number }): Promise<ExtractResult> {
   const out: ExtractResult = { documents: [], warnings: [] };
   let mail: ParsedMail;
   try {
@@ -120,7 +127,7 @@ async function extractFromEmail(data: Uint8Array, name: string, depth: number): 
     const fname = att.filename || `${name}#${att.contentType}`;
     const ct = att.contentType?.toLowerCase() ?? "";
     if (ct.startsWith("image/") || ct === "text/html") continue;
-    merge(out, await extractDocuments(att.content, fname, depth + 1));
+    merge(out, await extractDocuments(att.content, fname, depth + 1, budget));
   }
 
   // A few reporters inline the XML in the body instead of attaching it.

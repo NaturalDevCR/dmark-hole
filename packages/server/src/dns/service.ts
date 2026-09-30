@@ -31,6 +31,11 @@ export async function checkDomainDns(domainId: number): Promise<DnsReport> {
   const d = db.get<DomainRow>("SELECT id, name, dkim_selectors, dns_hash, dns_checked_at FROM domains WHERE id = ?", [domainId]);
   if (!d) throw new Error("Domain not found");
   const report = await runDnsChecks(d.name, json<string[]>(d.dkim_selectors, []));
+  if (report.inconclusive && d.dns_hash) {
+    // Keep the last good result; only bump the timestamp so we retry on schedule.
+    db.run("UPDATE domains SET dns_checked_at = ? WHERE id = ?", [report.checkedAt, d.id]);
+    return report;
+  }
   const snap = snapshot(report);
   db.tx(() => {
     db.run("UPDATE domains SET dns_checked_at = ?, dns_result = ?, dns_hash = ? WHERE id = ?", [

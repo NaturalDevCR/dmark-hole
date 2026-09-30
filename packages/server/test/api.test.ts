@@ -43,6 +43,16 @@ describe("HTTP API", () => {
     expect(again.statusCode).toBe(409);
   });
 
+  it("cannot be bypassed with percent-encoded paths", async () => {
+    for (const url of ["/%61pi/domains", "/api/%64omains", "/API/domains"]) {
+      const r = await app.inject({ url });
+      // Either rejected, or (for non-/api paths) the SPA shell — never API data.
+      expect(r.statusCode === 401 || r.statusCode === 404 || r.body.startsWith("<!doctype html>")).toBe(true);
+    }
+    const post = await app.inject({ method: "POST", url: "/%61pi/domains", payload: { name: "bypass.example" } });
+    expect([401, 404]).toContain(post.statusCode);
+  });
+
   it("rejects bad credentials", async () => {
     const r = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email: "admin@example.test", password: "nope" } });
     expect(r.statusCode).toBe(401);
@@ -58,7 +68,7 @@ describe("HTTP API", () => {
     expect(up.statusCode).toBe(200);
     expect(up.json()[0].counts.ok).toBe(1);
 
-    const list = await app.inject({ url: "/api/reports?from=2000-01-01&to=2100-01-01", headers: { cookie } });
+    const list = await app.inject({ url: "/api/reports?from=2020-01-01&to=2029-12-31", headers: { cookie } });
     const items = list.json().items;
     expect(items).toHaveLength(1);
 
@@ -69,10 +79,10 @@ describe("HTTP API", () => {
     expect(xml.headers["content-type"]).toContain("xml");
     expect(xml.body).toContain("<feedback");
 
-    const ov = await app.inject({ url: "/api/stats/overview?from=2000-01-01&to=2100-01-01", headers: { cookie } });
+    const ov = await app.inject({ url: "/api/stats/overview?from=2020-01-01&to=2029-12-31", headers: { cookie } });
     expect(ov.json().messages).toBeGreaterThan(0);
 
-    const csv = await app.inject({ url: "/api/export/records.csv?from=2000-01-01&to=2100-01-01", headers: { cookie } });
+    const csv = await app.inject({ url: "/api/export/records.csv?from=2020-01-01&to=2029-12-31", headers: { cookie } });
     expect(csv.body.split("\n")[0]).toContain("source_ip");
   });
 

@@ -62,19 +62,22 @@ function userFromRequest(req: FastifyRequest): AuthUser | undefined {
   );
 }
 
-/** Routes under /api that do not require a session. */
+/** Routes under /api that do not require a session (matched route patterns). */
 const PUBLIC = new Set(["/api/health", "/api/auth/status", "/api/auth/login", "/api/auth/setup", "/api/ingest/raw"]);
+/** Non-GET routes a viewer may call: their own session plus acknowledging alerts. */
+const VIEWER_WRITABLE = new Set(["/api/auth/logout", "/api/auth/password", "/api/alerts/:id/read", "/api/alerts/read-all"]);
 
 export function registerAuthHook(app: FastifyInstance) {
   app.addHook("onRequest", async (req) => {
-    if (!req.url.startsWith("/api/")) return;
-    const path = req.url.split("?")[0]!;
     req.user = userFromRequest(req);
-    if (PUBLIC.has(path)) return;
+    // Gate on the route pattern the router actually matched, never on the raw URL:
+    // the router percent-decodes paths, so "/%61pi/..." would otherwise slip past a
+    // string prefix check. Unmatched URLs fall through to the 404 handler.
+    const route = req.routeOptions.url;
+    if (!route || !route.startsWith("/api/")) return;
+    if (PUBLIC.has(route)) return;
     if (!req.user) throw new HttpError(401, "Not authenticated");
-    // Viewers are read-only (besides their own session and acknowledging alerts).
-    const viewerWritable = path.startsWith("/api/auth/") || /^\/api\/alerts\/(\d+\/read|read-all)$/.test(path);
-    if (req.method !== "GET" && req.user.role !== "admin" && !viewerWritable) {
+    if (req.method !== "GET" && req.method !== "HEAD" && req.user.role !== "admin" && !VIEWER_WRITABLE.has(route)) {
       throw new HttpError(403, "Admin role required");
     }
   });

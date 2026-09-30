@@ -24,6 +24,8 @@ services:
       TRUST_PROXY: "false"
       # Built-in SMTP receiver (can also be toggled in the UI).
       SMTP_ENABLED: "false"
+      # Required when the SMTP receiver is on (also editable in the UI).
+      # SMTP_ALLOWED_RECIPIENTS: "dmarc@reports.example.com"
       # Optional: fixed secret (>= 32 chars). If unset, one is generated in /data.
       # SECRET_KEY: "change-me-to-a-random-string-of-at-least-32-chars"
       # Optional: bootstrap admin. If unset, use the first-run setup page.

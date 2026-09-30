@@ -3,7 +3,7 @@ import { db, nowSec } from "../db/index.js";
 import { onDnsChange } from "../dns/service.js";
 import { events } from "../lib/events.js";
 import { logger } from "../lib/logger.js";
-import { getSettings } from "../settings.js";
+import { getSettings, smtpPassword } from "../settings.js";
 
 export type Severity = "info" | "warning" | "critical";
 const RANK: Record<Severity, number> = { info: 0, warning: 1, critical: 2 };
@@ -104,7 +104,7 @@ export async function notify(title: string, message: string, severity: Severity 
       host: n.email.host,
       port: n.email.port,
       secure: n.email.secure,
-      auth: n.email.username ? { user: n.email.username, pass: n.email.password } : undefined,
+      auth: n.email.username ? { user: n.email.username, pass: smtpPassword() } : undefined,
     });
     tasks.push(
       transport.sendMail({
@@ -160,10 +160,13 @@ function detectNewFailingSources(reportId: number, domainId: number, domain: str
   }
 }
 
-/** Daily: compliance below threshold for yesterday's data. */
+/**
+ * Daily: compliance below threshold. Checks the day before yesterday because
+ * reporters send day D's report during D+1, so yesterday is still incomplete.
+ */
 export function detectComplianceDrops() {
   const { complianceThreshold } = getSettings().alerts;
-  const day = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+  const day = new Date(Date.now() - 2 * 86400_000).toISOString().slice(0, 10);
   const rows = db.all<{ domain_id: number; name: string; pass: number; total: number }>(
     `SELECT r.domain_id, d.name, SUM(CASE WHEN r.dmarc_pass = 1 THEN r.count ELSE 0 END) pass, SUM(r.count) total
      FROM records r JOIN domains d ON d.id = r.domain_id WHERE r.day = ? GROUP BY r.domain_id HAVING total >= 20`,

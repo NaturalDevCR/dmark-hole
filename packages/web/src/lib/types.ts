@@ -282,7 +282,7 @@ export interface IngestLogItem {
 }
 
 export interface IngestStatus {
-  smtp: { running: boolean; host: string; port: number; tls: boolean; received: number; lastError: string | null };
+  smtp: { running: boolean; configured: boolean; host: string; port: number; tls: boolean; received: number; lastError: string | null };
   enrichment: { pending: number; active: number };
   counts: { reports: number; forensic: number; last: number | null };
   ingestToken: string | null;

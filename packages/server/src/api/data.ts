@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import type { FastifyInstance } from "fastify";
 import { gunzipSync } from "fflate";
 import { z } from "zod";
@@ -28,10 +29,24 @@ const filterQuery = z.object({
   days: z.coerce.number().int().min(1).max(3650).optional(),
 });
 
+const MAX_RANGE_DAYS = 3660;
+const CSV_MAX_ROWS = 2_000_000;
+
+function validDay(s: string): number {
+  const t = Date.parse(`${s}T00:00:00Z`);
+  if (!Number.isFinite(t) || new Date(t).toISOString().slice(0, 10) !== s) throw new HttpError(400, `Fecha inválida: ${s}`);
+  return t;
+}
+
 export function parseFilter(q: unknown): Filter {
   const f = filterQuery.parse(q);
-  const range = f.from && f.to ? { from: f.from, to: f.to } : defaultRange(f.days ?? 30);
-  return { domainId: f.domainId ?? null, ...range };
+  if (f.from && f.to) {
+    const span = (validDay(f.to) - validDay(f.from)) / 86400_000;
+    if (span < 0) throw new HttpError(400, "El rango de fechas está invertido");
+    if (span > MAX_RANGE_DAYS) throw new HttpError(400, "El rango máximo es de 10 años");
+    return { domainId: f.domainId ?? null, from: f.from, to: f.to };
+  }
+  return { domainId: f.domainId ?? null, ...defaultRange(f.days ?? 30) };
 }
 
 const domainName = z
@@ -308,13 +323,10 @@ export async function dataRoutes(app: FastifyInstance) {
       dsql = "AND r.domain_id = ?";
       params.push(f.domainId);
     }
-    const rows = db.all<Record<string, string | number | null>>(
-      `SELECT r.day, d.name domain, rp.org_name reporter, rp.report_id, r.source_ip, i.ptr, i.provider, i.country, i.asn, r.count,
+    const sql = `SELECT r.day, d.name domain, rp.org_name reporter, rp.report_id, r.source_ip, i.ptr, i.provider, i.country, i.asn, r.count,
          r.disposition, r.dkim_eval, r.spf_eval, r.dmarc_pass, r.category, r.header_from, r.envelope_from, r.dkim, r.spf
        FROM records r JOIN reports rp ON rp.id = r.report_id JOIN domains d ON d.id = r.domain_id LEFT JOIN ip_info i ON i.ip = r.source_ip
-       WHERE r.day BETWEEN ? AND ? ${dsql} ORDER BY r.day, d.name`,
-      params,
-    );
+       WHERE r.day BETWEEN ? AND ? ${dsql} ORDER BY r.day, d.name LIMIT ${CSV_MAX_ROWS}`;
     const cols = ["day", "domain", "reporter", "report_id", "source_ip", "ptr", "provider", "country", "asn", "count", "disposition", "dkim_eval", "spf_eval", "dmarc_pass", "category", "header_from", "envelope_from", "dkim", "spf"];
     const esc = (v: unknown) => {
       const s = v === null || v === undefined ? "" : String(v);
@@ -322,9 +334,22 @@ export async function dataRoutes(app: FastifyInstance) {
       const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
       return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
     };
-    const csv = [cols.join(","), ...rows.map((r) => cols.map((c) => esc(r[c])).join(","))].join("\n");
+    // Stream in batches so large exports neither buffer everything nor block the event loop.
+    async function* lines() {
+      yield `${cols.join(",")}\n`;
+      let batch: string[] = [];
+      for (const row of db.raw.prepare(sql).iterate(...params) as Iterable<Record<string, unknown>>) {
+        batch.push(cols.map((c) => esc(row[c])).join(","));
+        if (batch.length >= 1000) {
+          yield `${batch.join("\n")}\n`;
+          batch = [];
+          await new Promise((r) => setImmediate(r));
+        }
+      }
+      if (batch.length) yield `${batch.join("\n")}\n`;
+    }
     reply.header("content-type", "text/csv; charset=utf-8");
     reply.header("content-disposition", `attachment; filename="dmarc-records-${f.from}_${f.to}.csv"`);
-    return csv;
+    return reply.send(Readable.from(lines()));
   });
 }

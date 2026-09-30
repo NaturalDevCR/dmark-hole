@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { config } from "./config.js";
 import { db } from "./db/index.js";
+import { decrypt, encrypt } from "./lib/crypto.js";
 
 export const settingsSchema = z.object({
   /** Create domains automatically when a report arrives for an unknown policy_domain. */
@@ -105,6 +106,9 @@ export function getSettings(): Settings {
 export function updateSettings(patch: unknown): Settings {
   const prev = getSettings();
   const next = settingsSchema.parse(deepMerge(prev, patch));
+  // Secrets are stored encrypted; values already in ciphertext form pass through.
+  const pw = next.notifications.email.password;
+  if (pw && !pw.startsWith("v1:")) next.notifications.email.password = encrypt(pw);
   db.run(
     "INSERT INTO settings (key, value) VALUES ('app', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
     [JSON.stringify(next)],
@@ -122,4 +126,15 @@ export function updateSettings(patch: unknown): Settings {
 
 export function onSettingsChange(fn: Listener): void {
   listeners.push(fn);
+}
+
+/** Plaintext SMTP password for sending notifications (tolerates legacy plaintext values). */
+export function smtpPassword(): string {
+  const pw = getSettings().notifications.email.password;
+  if (!pw.startsWith("v1:")) return pw;
+  try {
+    return decrypt(pw);
+  } catch {
+    return "";
+  }
 }

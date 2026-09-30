@@ -199,4 +199,11 @@ export const migrations: { version: number; sql: string }[] = [
       CREATE INDEX idx_dns_history_domain ON dns_history(domain_id, checked_at);
     `,
   },
+  {
+    version: 2,
+    sql: `
+      -- Cross-domain dashboards filter by day only.
+      CREATE INDEX idx_records_day ON records(day);
+    `,
+  },
 ];

@@ -30,6 +30,14 @@ const mailboxBody = z.object({
   pollMinutes: z.coerce.number().int().min(1).max(1440).default(15),
 });
 
+// Marking as seen while reading every message would re-download the same mails forever.
+function checkMailbox<T extends { onlyUnseen: boolean; afterAction: string }>(b: T): T {
+  if (!b.onlyUnseen && b.afterAction === "seen") {
+    throw new HttpError(400, "Con «marcar como leído» debe procesar solo mensajes no leídos; use «mover» para procesar todos");
+  }
+  return b;
+}
+
 function mailboxOut(m: MailboxRow & Record<string, unknown>) {
   return {
     id: m.id,
@@ -76,7 +84,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.post("/api/mailboxes", async (req) => {
     requireAdmin(req);
-    const b = mailboxBody.parse(req.body);
+    const b = checkMailbox(mailboxBody.parse(req.body));
     if (!b.password) throw new HttpError(400, "La contraseña es obligatoria");
     const r = db.run(
       `INSERT INTO mailboxes (name, host, port, secure, username, password_enc, folder, after_action, processed_folder, failed_folder,
@@ -90,7 +98,7 @@ export async function adminRoutes(app: FastifyInstance) {
   app.put<{ Params: { id: string } }>("/api/mailboxes/:id", async (req) => {
     requireAdmin(req);
     const id = Number(req.params.id);
-    const b = mailboxBody.parse(req.body);
+    const b = checkMailbox(mailboxBody.parse(req.body));
     const existing = db.get<MailboxRow>("SELECT * FROM mailboxes WHERE id = ?", [id]);
     if (!existing) throw new HttpError(404, "Buzón no encontrado");
     const pw = b.password && b.password !== MASK ? encrypt(b.password) : existing.password_enc;

@@ -124,6 +124,7 @@ Todas las variables son opcionales. Ver [`.env.example`](.env.example). En syste
 | `WEB_DIST` | incluido | Ruta de la interfaz compilada |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | vacío | Administrador inicial; si faltan, se usa la página de configuración inicial |
 | `SMTP_ENABLED` | `false` | Activa el receptor SMTP integrado (también desde la UI) |
+| `SMTP_ALLOWED_RECIPIENTS` | vacío | Destinatarios aceptados por el receptor SMTP, separados por comas (`dmarc@reports.example.com`, `@reports.example.com`). **Obligatorio**: sin lista, el receptor rechaza todo. Editable en la UI |
 | `SMTP_PORT` | `2525` | Puerto del receptor SMTP |
 | `SMTP_LISTEN_HOST` | `0.0.0.0` | Dirección de escucha SMTP |
 | `SMTP_MAX_SIZE_MB` | `25` | Tamaño máximo de mensaje |
@@ -164,7 +165,7 @@ Crea un buzón (p. ej. `dmarc@yourdomain`) en tu proveedor de correo, usa esa di
 
 DMARK-Hole recibe el correo directamente, sin buzón intermedio.
 
-1. Activa `SMTP_ENABLED=true` (o desde la interfaz).
+1. Activa `SMTP_ENABLED=true` (o desde la interfaz) y define los destinatarios permitidos (`SMTP_ALLOWED_RECIPIENTS` o Ingesta → Receptor SMTP). Sin ellos el receptor rechaza todo el correo, para que nadie pueda inyectar reportes falsos.
 2. Crea un registro **MX** para un dominio o subdominio de reportes apuntando al host, p. ej. `reports.example.com. MX 10 dmark.example.com.`, y un registro A/AAAA para `dmark.example.com`.
 3. Usa `rua=mailto:dmarc@reports.example.com`. Si es un dominio distinto al monitorizado, añade el registro de autorización descrito arriba.
 4. Puertos: el servicio escucha en `SMTP_PORT` (2525 por defecto). El correo entrante llega al **25**, así que:

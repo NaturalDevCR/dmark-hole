@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { XMLParser } from "fast-xml-parser";
 import { isAligned, orgDomain } from "./alignment.js";
 import type { AggregateRecord, AggregateReport, Category, DkimAuth, SpfAuth } from "./types.js";
@@ -84,13 +85,22 @@ export function classify(r: Omit<AggregateRecord, "category">): Category {
   return "fail";
 }
 
+/** Returns a canonical IP string, or null for anything that is not an address. */
+export function normalizeIp(raw: string | null): string | null {
+  if (!raw) return null;
+  let ip = raw.trim().toLowerCase();
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
+  if (mapped) ip = mapped[1]!;
+  return isIP(ip) ? ip : null;
+}
+
 function parseRecord(node: Node, policy: AggregateReport["policy"]): AggregateRecord | null {
   const row = obj(node.row);
   const pe = obj(row.policy_evaluated);
   const ids = obj(node.identifiers);
   const auth = obj(node.auth_results);
 
-  const sourceIp = str(row.source_ip);
+  const sourceIp = normalizeIp(str(row.source_ip));
   if (!sourceIp) return null;
   const count = int(row.count) ?? 0;
   if (count <= 0) return null;

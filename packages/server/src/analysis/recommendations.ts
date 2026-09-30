@@ -81,7 +81,7 @@ export function recommendations(domainId: number): Recommendation[] {
       detail: `${p.misaligned.toLocaleString()} mensajes de ${p.name} pasan SPF/DKIM pero con otro dominio, por lo que fallan DMARC. Configure DKIM personalizado (dominio propio) o un Return-Path en su dominio en ese servicio.`,
     });
   }
-  const failing = sources({ domainId, ...range, limit: 200 }).filter((s) => s.status === "suspicious");
+  const failing = sources({ domainId, ...range, category: "suspicious", limit: 1_000_000 });
   const failingMsgs = failing.reduce((a, s) => a + s.fail, 0);
   if (failingMsgs > 0) {
     const protectedNow = policy === "reject" || policy === "quarantine";

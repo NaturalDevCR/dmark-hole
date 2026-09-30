@@ -12,6 +12,7 @@ let received = 0;
 export function smtpStatus() {
   return {
     running: !!server,
+    configured: allowedList().length > 0,
     host: config.smtp.host,
     port: config.smtp.port,
     tls: !!(config.smtp.tlsKey && config.smtp.tlsCert),
@@ -20,9 +21,17 @@ export function smtpStatus() {
   };
 }
 
+function allowedList(): string[] {
+  const fromSettings = getSettings().smtpReceiver.allowedRecipients;
+  const list = fromSettings.length ? fromSettings : config.smtp.allowedRecipients;
+  return list.map((a) => a.trim().toLowerCase()).filter(Boolean);
+}
+
 function recipientAllowed(address: string): boolean {
-  const allowed = getSettings().smtpReceiver.allowedRecipients.map((a) => a.trim().toLowerCase()).filter(Boolean);
-  if (!allowed.length) return true;
+  // An open receiver would let anyone on the Internet inject fake reports, create
+  // domains and trigger alerts, so an allow-list is mandatory.
+  const allowed = allowedList();
+  if (!allowed.length) return false;
   const addr = address.toLowerCase();
   // Entries can be full addresses or "@domain" to accept a whole domain.
   return allowed.some((a) => (a.startsWith("@") ? addr.endsWith(a) : addr === a));
@@ -36,10 +45,13 @@ export async function startSmtp(): Promise<void> {
     authOptional: true,
     disabledCommands: ["AUTH"],
     size: config.smtp.maxSize,
+    maxClients: 50,
+    socketTimeout: 60_000,
+    closeTimeout: 10_000,
     logger: false,
     onRcptTo(address, _session, cb) {
       if (!recipientAllowed(address.address)) {
-        const err = new Error("Recipient not accepted") as Error & { responseCode: number };
+        const err = new Error(allowedList().length ? "Recipient not accepted" : "Receiver has no allowed recipients configured") as Error & { responseCode: number };
         err.responseCode = 550;
         return cb(err);
       }
@@ -47,11 +59,12 @@ export async function startSmtp(): Promise<void> {
     },
     onData(stream, session, cb) {
       const chunks: Buffer[] = [];
-      let tooBig = false;
-      stream.on("data", (c: Buffer) => chunks.push(c));
+      // smtp-server keeps streaming past the advertised SIZE; stop buffering once exceeded.
+      stream.on("data", (c: Buffer) => {
+        if (!(stream as unknown as { sizeExceeded?: boolean }).sizeExceeded) chunks.push(c);
+      });
       stream.on("end", () => {
-        tooBig = (stream as unknown as { sizeExceeded?: boolean }).sizeExceeded === true;
-        if (tooBig) {
+        if ((stream as unknown as { sizeExceeded?: boolean }).sizeExceeded) {
           const err = new Error("Message exceeds maximum size") as Error & { responseCode: number };
           err.responseCode = 552;
           return cb(err);

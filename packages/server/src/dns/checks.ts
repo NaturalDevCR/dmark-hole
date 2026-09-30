@@ -1,4 +1,5 @@
 import { createHash, createPublicKey } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { Resolver } from "node:dns/promises";
 import { orgDomain } from "../dmarc/alignment.js";
 
@@ -11,13 +12,38 @@ export interface Check {
 
 const resolver = new Resolver({ timeout: 5000, tries: 2 });
 
+/**
+ * Per-run context: any lookup that fails for reasons other than "no such record"
+ * (timeouts, SERVFAIL) marks the whole run inconclusive so a flaky resolver is
+ * never mistaken for a DNS change.
+ */
+const runCtx = new AsyncLocalStorage<{ inconclusive: boolean }>();
+
+const isNoData = (err: unknown) => ["ENOTFOUND", "ENODATA"].includes((err as NodeJS.ErrnoException).code ?? "");
+
+function markInconclusive(err: unknown) {
+  if (!isNoData(err)) {
+    const ctx = runCtx.getStore();
+    if (ctx) ctx.inconclusive = true;
+  }
+}
+
 async function txt(name: string): Promise<string[] | null> {
   try {
     return (await resolver.resolveTxt(name)).map((chunks) => chunks.join(""));
   } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === "ENOTFOUND" || code === "ENODATA") return [];
+    if (isNoData(err)) return [];
+    markInconclusive(err);
     return null; // SERVFAIL / timeout: unknown
+  }
+}
+
+async function lookupOr<T>(p: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await p;
+  } catch (err) {
+    markInconclusive(err);
+    return fallback;
   }
 }
 
@@ -171,13 +197,21 @@ export interface SpfCheck {
 
 const LOOKUP_MECHS = new Set(["include", "a", "mx", "ptr", "exists", "redirect"]);
 
-async function resolveSpf(domain: string, state: { lookups: number; void: number; seen: Set<string> }, depth: number): Promise<SpfNode> {
+/** Past this many lookups the record is already broken; stop walking to bound work. */
+const SPF_WALK_LIMIT = 25;
+
+async function resolveSpf(domain: string, state: { lookups: number; void: number }, path: string[]): Promise<SpfNode> {
   const node: SpfNode = { domain, record: null, lookups: 0, mechanisms: [], children: [] };
-  if (depth > 10 || state.seen.has(domain)) {
-    node.error = "Bucle o anidamiento excesivo";
+  // Loop detection is per include path: RFC 7208 counts every occurrence of a
+  // repeated include, so the same domain on two branches is legitimate.
+  if (path.includes(domain)) {
+    node.error = "Bucle de includes";
     return node;
   }
-  state.seen.add(domain);
+  if (path.length > 10) {
+    node.error = "Anidamiento excesivo";
+    return node;
+  }
   const records = await txt(domain);
   if (records === null) {
     node.error = "Error de DNS";
@@ -193,27 +227,31 @@ async function resolveSpf(domain: string, state: { lookups: number; void: number
   node.record = spf[0]!.trim();
 
   for (const term of node.record.split(/\s+/).slice(1)) {
-    const m = /^([+\-~?]?)([a-z0-9]+)(?:[:=](.*))?$/i.exec(term);
+    // mechanism[:value][/cidr]; "a/24" and "mx/24" carry only a CIDR.
+    const m = /^([+\-~?]?)([a-z0-9]+)(?:[:=](.*)|(\/.*))?$/i.exec(term);
     if (!m) continue;
     const qualifier = m[1] || "+";
     const type = m[2]!.toLowerCase();
-    const value = m[3] ?? null;
+    const value = m[3] ?? m[4] ?? null;
     if (type === "exp") continue;
     node.mechanisms.push({ qualifier, type, value });
     if (!LOOKUP_MECHS.has(type)) continue;
     node.lookups++;
     state.lookups++;
-    if ((type === "include" || type === "redirect") && value && !value.includes("%{")) {
-      node.children.push(await resolveSpf(value.toLowerCase(), state, depth + 1));
+    if (state.lookups > SPF_WALK_LIMIT) {
+      node.error = "Demasiadas consultas; análisis detenido";
+      break;
+    }
+    const target = (m[3]?.split("/")[0] || domain).toLowerCase();
+    if ((type === "include" || type === "redirect") && m[3] && !m[3].includes("%{")) {
+      node.children.push(await resolveSpf(target, state, [...path, domain]));
     } else if (type === "mx") {
-      const target = value?.split("/")[0] || domain;
-      const mx = await resolver.resolveMx(target).catch(() => []);
+      const mx = await lookupOr(resolver.resolveMx(target), []);
       if (mx.length === 0) state.void++;
       // Each MX host needs an address lookup too; RFC 7208 caps them at 10.
       if (mx.length > 10) node.error = "Más de 10 registros MX en mecanismo mx";
     } else if (type === "a") {
-      const target = value?.split("/")[0] || domain;
-      const [a4, a6] = await Promise.all([resolver.resolve4(target).catch(() => []), resolver.resolve6(target).catch(() => [])]);
+      const [a4, a6] = await Promise.all([lookupOr(resolver.resolve4(target), []), lookupOr(resolver.resolve6(target), [])]);
       if (a4.length + a6.length === 0) state.void++;
     }
   }
@@ -222,8 +260,8 @@ async function resolveSpf(domain: string, state: { lookups: number; void: number
 
 async function checkSpf(domain: string): Promise<SpfCheck> {
   const out: SpfCheck = { record: null, tree: null, lookups: 0, voidLookups: 0, all: null, checks: [] };
-  const state = { lookups: 0, void: 0, seen: new Set<string>() };
-  const tree = await resolveSpf(domain, state, 0);
+  const state = { lookups: 0, void: 0 };
+  const tree = await resolveSpf(domain, state, []);
   out.tree = tree;
   out.record = tree.record;
   out.lookups = state.lookups;
@@ -366,7 +404,7 @@ async function checkDkim(domain: string, knownSelectors: string[]): Promise<{ se
 
 async function checkMx(domain: string) {
   const checks: Check[] = [];
-  const hosts = await resolver.resolveMx(domain).catch(() => [] as { exchange: string; priority: number }[]);
+  const hosts = await lookupOr(resolver.resolveMx(domain), [] as { exchange: string; priority: number }[]);
   hosts.sort((a, b) => a.priority - b.priority);
   if (hosts.length === 0) checks.push({ status: "info", title: "Sin registros MX", detail: "El dominio no recibe correo. Considere SPF \"v=spf1 -all\" y DMARC p=reject si tampoco envía." });
   else if (hosts.length === 1 && hosts[0]!.exchange === "") checks.push({ status: "info", title: "Null MX (RFC 7505): el dominio no acepta correo" });
@@ -449,9 +487,11 @@ export interface DnsReport {
   score: number;
   /** Stable hash of the published records, used to detect DNS changes. */
   hash: string;
+  /** Some lookup timed out or failed; the hash must not be trusted for change detection. */
+  inconclusive: boolean;
 }
 
-function scoreOf(r: Omit<DnsReport, "score" | "hash">): number {
+function scoreOf(r: Omit<DnsReport, "score" | "hash" | "inconclusive">): number {
   let s = 0;
   const p = r.dmarc.tags.p?.toLowerCase();
   if (r.dmarc.record) s += 15;
@@ -471,6 +511,11 @@ function scoreOf(r: Omit<DnsReport, "score" | "hash">): number {
 }
 
 export async function runDnsChecks(domain: string, knownSelectors: string[] = []): Promise<DnsReport> {
+  const ctx = { inconclusive: false };
+  return runCtx.run(ctx, () => runAll(domain, knownSelectors, ctx));
+}
+
+async function runAll(domain: string, knownSelectors: string[], ctx: { inconclusive: boolean }): Promise<DnsReport> {
   const [dmarc, spf, dkim, mx, mtaSts, tlsRpt] = await Promise.all([
     checkDmarc(domain),
     checkSpf(domain),
@@ -494,5 +539,5 @@ export async function runDnsChecks(domain: string, knownSelectors: string[] = []
       ]),
     )
     .digest("hex");
-  return { ...base, score: scoreOf(base), hash };
+  return { ...base, score: scoreOf(base), hash, inconclusive: ctx.inconclusive };
 }

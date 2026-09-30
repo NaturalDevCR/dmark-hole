@@ -74,17 +74,20 @@ const dockerRun = computed(() => `-p 25:${port.value}`);
             <div><dt class="text-xs text-muted">Recibidos</dt><dd class="tabular-nums">{{ status.smtp.received.toLocaleString("es") }}</dd></div>
             <div><dt class="text-xs text-muted">TLS (STARTTLS)</dt><dd>{{ status.smtp.tls ? "Configurado" : "No configurado" }}</dd></div>
           </dl>
+          <p v-if="status && !status.smtp.configured" class="rounded-lg border border-misaligned/25 bg-misaligned-soft px-3 py-2 text-xs text-misaligned">
+            Configure al menos un destinatario permitido; mientras tanto el receptor rechaza todos los mensajes.
+          </p>
           <p v-if="status?.smtp.lastError" class="break-words rounded-lg border border-fail/20 bg-fail-soft px-3 py-2 text-xs text-fail">{{ status.smtp.lastError }}</p>
         </div>
       </Card>
 
-      <Card v-if="admin" title="Destinatarios permitidos" subtitle="Restringe qué direcciones RCPT TO acepta el receptor">
+      <Card v-if="admin" title="Destinatarios permitidos" subtitle="Direcciones RCPT TO que el receptor acepta (obligatorio)">
         <Skeleton v-if="loading || !draft" class="h-32" />
         <form v-else class="space-y-3" @submit.prevent="save">
           <div>
             <label class="label" for="smtp-rcpt">Direcciones (una por línea o separadas por comas)</label>
             <textarea id="smtp-rcpt" v-model="draft.recipients" rows="4" class="input mono" placeholder="dmarc@reports.example.com&#10;@reports.example.com" spellcheck="false" />
-            <p class="mt-1.5 text-xs text-muted">Use una dirección completa (<span class="mono">dmarc@example.com</span>) o <span class="mono">@example.com</span> para aceptar todo un dominio. Vacío = acepta cualquier destinatario.</p>
+            <p class="mt-1.5 text-xs text-muted">Use una dirección completa (<span class="mono">dmarc@example.com</span>) o <span class="mono">@example.com</span> para aceptar todo un dominio. Obligatorio: sin destinatarios el receptor rechaza todo el correo, para que nadie en Internet pueda inyectar reportes falsos.</p>
           </div>
           <div class="flex justify-end gap-2">
             <button v-if="dirty" type="button" class="btn-ghost" @click="reset">Descartar</button>
