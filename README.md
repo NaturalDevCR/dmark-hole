@@ -308,3 +308,7 @@ pnpm typecheck
 ```
 
 Estructura: `packages/server` (`@dmark-hole/server`, Fastify + `node:sqlite`) y `packages/web` (`@dmark-hole/web`, Vue 3 + Vite). En producción el servidor sirve la SPA compilada y la API bajo `/api`.
+
+## Licencia
+
+[MIT](LICENSE): puede usarlo, modificarlo y redistribuirlo libremente, incluso con fines comerciales, manteniendo el aviso de copyright.
