@@ -8,6 +8,7 @@ import { isMailboxRunning, runMailbox, testMailbox, type MailboxRow } from "../i
 import { smtpStatus } from "../ingest/smtp.js";
 import { ingestBlob } from "../ingest/store.js";
 import { decrypt, encrypt, randomToken, sha256 } from "../lib/crypto.js";
+import { t } from "../i18n/index.js";
 import { getSettings, updateSettings, type Settings } from "../settings.js";
 import { HttpError, requireAdmin } from "./auth.js";
 
@@ -33,7 +34,7 @@ const mailboxBody = z.object({
 // Marking as seen while reading every message would re-download the same mails forever.
 function checkMailbox<T extends { onlyUnseen: boolean; afterAction: string }>(b: T): T {
   if (!b.onlyUnseen && b.afterAction === "seen") {
-    throw new HttpError(400, "Con «marcar como leído» debe procesar solo mensajes no leídos; use «mover» para procesar todos");
+    throw new HttpError(400, "error.mailboxSeenRequiresUnseen");
   }
   return b;
 }
@@ -85,7 +86,7 @@ export async function adminRoutes(app: FastifyInstance) {
   app.post("/api/mailboxes", async (req) => {
     requireAdmin(req);
     const b = checkMailbox(mailboxBody.parse(req.body));
-    if (!b.password) throw new HttpError(400, "La contraseña es obligatoria");
+    if (!b.password) throw new HttpError(400, "error.passwordRequired");
     const r = db.run(
       `INSERT INTO mailboxes (name, host, port, secure, username, password_enc, folder, after_action, processed_folder, failed_folder,
          only_unseen, tls_reject_unauthorized, enabled, poll_minutes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -100,7 +101,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const id = Number(req.params.id);
     const b = checkMailbox(mailboxBody.parse(req.body));
     const existing = db.get<MailboxRow>("SELECT * FROM mailboxes WHERE id = ?", [id]);
-    if (!existing) throw new HttpError(404, "Buzón no encontrado");
+    if (!existing) throw new HttpError(404, "error.mailboxNotFound");
     const pw = b.password && b.password !== MASK ? encrypt(b.password) : existing.password_enc;
     db.run(
       `UPDATE mailboxes SET name = ?, host = ?, port = ?, secure = ?, username = ?, password_enc = ?, folder = ?, after_action = ?,
@@ -126,7 +127,7 @@ export async function adminRoutes(app: FastifyInstance) {
       const row = db.get<{ password_enc: string }>("SELECT password_enc FROM mailboxes WHERE id = ?", [b.id]);
       if (row) password = decrypt(row.password_enc);
     }
-    if (!password) throw new HttpError(400, "La contraseña es obligatoria");
+    if (!password) throw new HttpError(400, "error.passwordRequired");
     try {
       return await testMailbox(
         { host: b.host, port: b.port, secure: b.secure ? 1 : 0, username: b.username, tls_reject_unauthorized: b.tlsRejectUnauthorized ? 1 : 0, folder: b.folder },
@@ -134,7 +135,7 @@ export async function adminRoutes(app: FastifyInstance) {
       );
     } catch (err) {
       const e = err as Error & { responseText?: string; authenticationFailed?: boolean };
-      throw new HttpError(400, e.authenticationFailed ? "Autenticación fallida" : e.responseText || e.message);
+      throw new HttpError(400, e.authenticationFailed ? "error.imapAuthFailed" : e.responseText || e.message);
     }
   });
 
@@ -167,10 +168,10 @@ export async function adminRoutes(app: FastifyInstance) {
   app.post("/api/ingest/raw", { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } }, async (req) => {
     const auth = req.headers.authorization ?? "";
     const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-    if (!token || sha256(token) !== sha256(ingestToken())) throw new HttpError(401, "Invalid ingest token");
+    if (!token || sha256(token) !== sha256(ingestToken())) throw new HttpError(401, "error.invalidIngestToken");
     const body = req.body;
     const buf = Buffer.isBuffer(body) ? body : typeof body === "string" ? Buffer.from(body) : null;
-    if (!buf?.length) throw new HttpError(400, "Empty body");
+    if (!buf?.length) throw new HttpError(400, "error.emptyBody");
     return ingestBlob(buf, "http", String(req.headers["x-filename"] ?? "http-upload"));
   });
 
@@ -221,7 +222,8 @@ export async function adminRoutes(app: FastifyInstance) {
   app.post("/api/settings/test-notification", async (req) => {
     requireAdmin(req);
     try {
-      await notify("Prueba de notificación", "Si ve este mensaje, las notificaciones de DMARK-Hole funcionan correctamente.", "info");
+      const locale = getSettings().language;
+      await notify(t(locale, "alert.test.title"), t(locale, "alert.test.message"), "info");
       return { ok: true };
     } catch (err) {
       throw new HttpError(400, (err as Error).message);

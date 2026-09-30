@@ -15,10 +15,12 @@ import {
   timeseries,
   type Filter,
 } from "../analysis/stats.js";
+import { renderAlert } from "../alerts/render.js";
 import { db, json, nowSec } from "../db/index.js";
-import type { DnsReport } from "../dns/checks.js";
+import { localizeDnsReport, type DnsReport } from "../dns/checks.js";
 import { checkDomainDns } from "../dns/service.js";
 import { lookupIp } from "../enrich/ip.js";
+import { localeOf } from "../i18n/index.js";
 import { HttpError } from "./auth.js";
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -34,7 +36,7 @@ const CSV_MAX_ROWS = 2_000_000;
 
 function validDay(s: string): number {
   const t = Date.parse(`${s}T00:00:00Z`);
-  if (!Number.isFinite(t) || new Date(t).toISOString().slice(0, 10) !== s) throw new HttpError(400, `Fecha inválida: ${s}`);
+  if (!Number.isFinite(t) || new Date(t).toISOString().slice(0, 10) !== s) throw new HttpError(400, "error.invalidDate", { date: s });
   return t;
 }
 
@@ -42,8 +44,8 @@ export function parseFilter(q: unknown): Filter {
   const f = filterQuery.parse(q);
   if (f.from && f.to) {
     const span = (validDay(f.to) - validDay(f.from)) / 86400_000;
-    if (span < 0) throw new HttpError(400, "El rango de fechas está invertido");
-    if (span > MAX_RANGE_DAYS) throw new HttpError(400, "El rango máximo es de 10 años");
+    if (span < 0) throw new HttpError(400, "error.rangeInverted");
+    if (span > MAX_RANGE_DAYS) throw new HttpError(400, "error.rangeTooLong");
     return { domainId: f.domainId ?? null, from: f.from, to: f.to };
   }
   return { domainId: f.domainId ?? null, ...defaultRange(f.days ?? 30) };
@@ -54,7 +56,7 @@ const domainName = z
   .trim()
   .toLowerCase()
   .transform((s) => s.replace(/\.$/, ""))
-  .pipe(z.string().regex(/^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, "Dominio inválido"));
+  .pipe(z.string().regex(/^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, "Invalid domain"));
 
 const pageQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -76,7 +78,7 @@ export async function dataRoutes(app: FastifyInstance) {
 
   app.post("/api/domains", async (req) => {
     const body = z.object({ name: domainName, displayName: z.string().max(100).optional(), notes: z.string().max(2000).optional() }).parse(req.body);
-    if (db.get("SELECT 1 FROM domains WHERE name = ?", [body.name])) throw new HttpError(409, "El dominio ya existe");
+    if (db.get("SELECT 1 FROM domains WHERE name = ?", [body.name])) throw new HttpError(409, "error.domainExists");
     const r = db.run("INSERT INTO domains (name, display_name, notes, created_at) VALUES (?, ?, ?, ?)", [
       body.name,
       body.displayName || null,
@@ -89,13 +91,15 @@ export async function dataRoutes(app: FastifyInstance) {
   });
 
   app.get<{ Params: { id: string } }>("/api/domains/:id", async (req) => {
+    const locale = localeOf(req);
     const id = Number(req.params.id);
     const d = db.get<Record<string, unknown>>(
       "SELECT id, name, display_name displayName, notes, auto_created autoCreated, dkim_selectors dkimSelectors, dns_checked_at dnsCheckedAt, dns_result dnsResult, created_at createdAt FROM domains WHERE id = ?",
       [id],
     );
-    if (!d) throw new HttpError(404, "Dominio no encontrado");
-    return { ...d, dkimSelectors: json(d.dkimSelectors, []), dnsResult: json<DnsReport | null>(d.dnsResult, null), autoCreated: !!d.autoCreated };
+    if (!d) throw new HttpError(404, "error.domainNotFound");
+    const dns = json<DnsReport | null>(d.dnsResult, null);
+    return { ...d, dkimSelectors: json(d.dkimSelectors, []), dnsResult: dns ? localizeDnsReport(dns, locale) : null, autoCreated: !!d.autoCreated };
   });
 
   app.patch<{ Params: { id: string } }>("/api/domains/:id", async (req) => {
@@ -120,7 +124,11 @@ export async function dataRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  app.post<{ Params: { id: string } }>("/api/domains/:id/dns-check", async (req) => checkDomainDns(Number(req.params.id)));
+  app.post<{ Params: { id: string } }>("/api/domains/:id/dns-check", async (req) => {
+    const id = Number(req.params.id);
+    if (!db.get("SELECT 1 FROM domains WHERE id = ?", [id])) throw new HttpError(404, "error.domainNotFound");
+    return localizeDnsReport(await checkDomainDns(id), localeOf(req));
+  });
 
   app.get<{ Params: { id: string } }>("/api/domains/:id/dns-history", async (req) =>
     db
@@ -128,7 +136,7 @@ export async function dataRoutes(app: FastifyInstance) {
       .map((r) => ({ checkedAt: r.checked_at, records: json(r.records, {}) })),
   );
 
-  app.get<{ Params: { id: string } }>("/api/domains/:id/recommendations", async (req) => recommendations(Number(req.params.id)));
+  app.get<{ Params: { id: string } }>("/api/domains/:id/recommendations", async (req) => recommendations(Number(req.params.id), localeOf(req)));
 
   // -------------------------------------------------------------------- stats
   app.get("/api/stats/overview", async (req) => overview(parseFilter(req.query)));
@@ -211,7 +219,7 @@ export async function dataRoutes(app: FastifyInstance) {
        FROM reports rp JOIN domains d ON d.id = rp.domain_id WHERE rp.id = ?`,
       [id],
     );
-    if (!report) throw new HttpError(404, "Reporte no encontrado");
+    if (!report) throw new HttpError(404, "error.reportNotFound");
     const records = db.all<Record<string, unknown>>(
       `SELECT r.id, r.source_ip sourceIp, r.count, r.disposition, r.dkim_eval dkimEval, r.spf_eval spfEval, r.dmarc_pass dmarcPass,
          r.reasons, r.header_from headerFrom, r.envelope_from envelopeFrom, r.envelope_to envelopeTo, r.dkim, r.spf, r.category,
@@ -231,7 +239,7 @@ export async function dataRoutes(app: FastifyInstance) {
     const r = db.get<{ raw_xml: Uint8Array | null; org_name: string; report_id: string }>("SELECT raw_xml, org_name, report_id FROM reports WHERE id = ?", [
       Number(req.params.id),
     ]);
-    if (!r?.raw_xml) throw new HttpError(404, "XML no disponible");
+    if (!r?.raw_xml) throw new HttpError(404, "error.xmlUnavailable");
     const safe = `${r.org_name}_${r.report_id}`.replace(/[^\w.-]+/g, "_").slice(0, 120);
     reply.header("content-type", "application/xml; charset=utf-8");
     reply.header("content-disposition", `attachment; filename="${safe}.xml"`);
@@ -270,7 +278,7 @@ export async function dataRoutes(app: FastifyInstance) {
       `SELECT f.*, d.name domain FROM forensic_reports f LEFT JOIN domains d ON d.id = f.domain_id WHERE f.id = ?`,
       [Number(req.params.id)],
     );
-    if (!r) throw new HttpError(404, "Reporte no encontrado");
+    if (!r) throw new HttpError(404, "error.reportNotFound");
     return r;
   });
 
@@ -298,7 +306,17 @@ export async function dataRoutes(app: FastifyInstance) {
       q.pageSize,
     );
     const unread = db.get<{ n: number }>("SELECT COUNT(*) n FROM alerts WHERE read_at IS NULL")?.n ?? 0;
-    return { ...res, unread, items: res.items.map((a) => ({ ...a, data: json(a.data, {}) })) };
+    const locale = localeOf(req);
+    return {
+      ...res,
+      unread,
+      items: res.items.map((a) => {
+        const data = json<Record<string, unknown>>(a.data, {});
+        // Re-render in the request locale; older alerts (no params) keep their stored text.
+        const text = renderAlert(locale, String(a.type), { domain: a.domain, ...data });
+        return { ...a, ...text, data };
+      }),
+    };
   });
 
   app.post<{ Params: { id: string } }>("/api/alerts/:id/read", async (req) => {

@@ -8,6 +8,7 @@ import { ZodError } from "zod";
 import { adminRoutes } from "./api/admin.js";
 import { authRoutes, HttpError, registerAuthHook } from "./api/auth.js";
 import { dataRoutes } from "./api/data.js";
+import { localeOf, t } from "./i18n/index.js";
 import { config } from "./config.js";
 import { db } from "./db/index.js";
 import { logger } from "./lib/logger.js";
@@ -36,12 +37,12 @@ export async function buildApp() {
 
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof ZodError) {
-      return reply.status(400).send({ error: "Datos inválidos", issues: err.issues.map((i) => ({ path: i.path.join("."), message: i.message })) });
+      return reply.status(400).send({ error: t(localeOf(req), "error.validation"), issues: err.issues.map((i) => ({ path: i.path.join("."), message: i.message })) });
     }
-    if (err instanceof HttpError) return reply.status(err.statusCode).send({ error: err.message });
+    if (err instanceof HttpError) return reply.status(err.statusCode).send({ error: t(localeOf(req), err.key, err.params), code: err.key });
     const status = (err as { statusCode?: number }).statusCode ?? 500;
     if (status >= 500) req.log.error({ err, url: req.url }, "request failed");
-    return reply.status(status).send({ error: status >= 500 ? "Error interno del servidor" : (err as Error).message });
+    return reply.status(status).send({ error: status >= 500 ? t(localeOf(req), "error.internal") : (err as Error).message });
   });
 
   app.get("/api/health", async () => {

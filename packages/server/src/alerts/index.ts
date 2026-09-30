@@ -4,6 +4,7 @@ import { onDnsChange } from "../dns/service.js";
 import { events } from "../lib/events.js";
 import { logger } from "../lib/logger.js";
 import { getSettings, smtpPassword } from "../settings.js";
+import { renderAlert } from "./render.js";
 
 export type Severity = "info" | "warning" | "critical";
 const RANK: Record<Severity, number> = { info: 0, warning: 1, critical: 2 };
@@ -12,9 +13,8 @@ export interface NewAlert {
   domainId: number | null;
   type: string;
   severity: Severity;
-  title: string;
-  message: string;
-  data?: Record<string, unknown>;
+  /** Everything needed to render the text (see alerts/render.ts); also stored with the alert. */
+  data: Record<string, unknown>;
   /** Alerts with the same key within `dedupHours` are dropped. */
   dedupKey?: string;
   dedupHours?: number;
@@ -22,6 +22,10 @@ export interface NewAlert {
 
 export function raiseAlert(a: NewAlert): number | null {
   const settings = getSettings();
+  // Stored text is English (back-compat for readers of the columns); the UI re-renders it
+  // per request locale and notifications use the configured language.
+  const stored = renderAlert("en", a.type, a.data) ?? { title: a.type, message: "" };
+  const outgoing = renderAlert(settings.language, a.type, a.data) ?? stored;
   if (!settings.alerts.enabled) return null;
   if (a.dedupKey) {
     const recent = db.get("SELECT 1 FROM alerts WHERE dedup_key = ? AND created_at > ?", [a.dedupKey, nowSec() - (a.dedupHours ?? 24) * 3600]);
@@ -29,10 +33,10 @@ export function raiseAlert(a: NewAlert): number | null {
   }
   const r = db.run(
     "INSERT INTO alerts (domain_id, type, severity, title, message, data, dedup_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    [a.domainId, a.type, a.severity, a.title, a.message, JSON.stringify(a.data ?? {}), a.dedupKey ?? null, nowSec()],
+    [a.domainId, a.type, a.severity, stored.title, stored.message, JSON.stringify(a.data), a.dedupKey ?? null, nowSec()],
   );
   if (RANK[a.severity] >= RANK[settings.alerts.minSeverity]) {
-    notify(a.title, a.message, a.severity)
+    notify(outgoing.title, outgoing.message, a.severity)
       .then(() => db.run("UPDATE alerts SET notified_at = ? WHERE id = ?", [nowSec(), r.lastInsertRowid]))
       .catch((err) => logger.warn({ err: (err as Error).message }, "alert notification failed"));
   }
@@ -146,14 +150,11 @@ function detectNewFailingSources(reportId: number, domainId: number, domain: str
     );
     if (seenBefore) continue;
     const info = db.get<{ ptr: string | null; provider: string | null; country: string | null }>("SELECT ptr, provider, country FROM ip_info WHERE ip = ?", [c.source_ip]);
-    const who = info?.provider ?? info?.ptr ?? "origen desconocido";
     raiseAlert({
       domainId,
       type: "new_failing_source",
       severity: c.fail >= min * 10 ? "critical" : "warning",
-      title: `Nueva fuente no autenticada para ${domain}`,
-      message: `${c.source_ip} (${who}${info?.country ? `, ${info.country}` : ""}) envió ${c.fail} de ${c.total} mensajes que fallaron DMARC.`,
-      data: { ip: c.source_ip, fail: c.fail, total: c.total, reportId },
+      data: { domain, ip: c.source_ip, origin: info?.provider ?? info?.ptr ?? null, country: info?.country ?? null, fail: c.fail, total: c.total, reportId },
       dedupKey: `new_failing_source:${domainId}:${c.source_ip}`,
       dedupHours: 24 * 7,
     });
@@ -179,9 +180,7 @@ export function detectComplianceDrops() {
       domainId: r.domain_id,
       type: "compliance_drop",
       severity: rate < complianceThreshold - 20 ? "critical" : "warning",
-      title: `Cumplimiento DMARC bajo en ${r.name}: ${rate.toFixed(1)}%`,
-      message: `El ${day} solo ${r.pass} de ${r.total} mensajes pasaron DMARC (umbral ${complianceThreshold}%).`,
-      data: { day, pass: r.pass, total: r.total },
+      data: { domain: r.name, day, pass: r.pass, total: r.total, rate: Math.round(rate * 10) / 10, threshold: complianceThreshold },
       dedupKey: `compliance_drop:${r.domain_id}:${day}`,
       dedupHours: 48,
     });
@@ -201,8 +200,7 @@ export function initAlerts() {
       domainId: e.domainId,
       type: "forensic_report",
       severity: "info",
-      title: "Nuevo reporte forense (RUF)",
-      message: "Se recibió un reporte de fallo individual. Revíselo en la sección Forenses.",
+      data: {},
       dedupKey: `forensic:${e.domainId}`,
       dedupHours: 6,
     });
@@ -214,11 +212,7 @@ export function initAlerts() {
       domainId: c.domainId,
       type: "dns_change",
       severity: critical ? "warning" : "info",
-      title: `Cambio DNS detectado en ${c.domain}`,
-      message: `Registros modificados: ${changed.join(", ") || "desconocido"}.${
-        changed.includes("dmarc") ? `\nDMARC antes: ${String(c.before.dmarc ?? "—")}\nDMARC ahora: ${String(c.after.dmarc ?? "—")}` : ""
-      }`,
-      data: { changed, before: c.before, after: c.after },
+      data: { domain: c.domain, changed, before: c.before, after: c.after },
     });
   });
 }

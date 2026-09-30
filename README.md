@@ -1,25 +1,33 @@
+🇬🇧 English · 🇪🇸 [Español](README.es.md)
+
 # DMARK-Hole
 
-Receptor y analizador de reportes DMARC auto-alojado. Un único proceso (Node.js + SQLite), sin base de datos externa, sin Redis, sin módulos nativos.
+![License: MIT](https://img.shields.io/badge/license-MIT-green) ![Node 24](https://img.shields.io/badge/Node-24-339933?logo=nodedotjs&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white) ![Proxmox LXC](https://img.shields.io/badge/Proxmox-LXC-E57000?logo=proxmox&logoColor=white)
 
-## Qué hace
+A self-hosted DMARC report receiver and analyzer. A single process (Node.js 24 + `node:sqlite`): no external database, no Redis, no native modules.
 
-- **Recibe** reportes agregados (**rua**) y forenses (**ruf**) de uno o varios dominios: sondeo **IMAP** de un buzón, **receptor SMTP integrado**, **HTTP con token** o **subida manual** de archivos (XML, gz, zip, eml).
-- **Analiza** cada reporte y **enriquece** las IP de origen con DNS inverso, ASN y país.
-- **Clasifica** el tráfico en cuatro categorías: `pass`, `forwarded` (reenvíos legítimos), `misaligned` (desalineado) y `fail`.
-- **Comprueba el DNS** de cada dominio (DMARC, SPF, DKIM, MTA-STS, TLS-RPT y BIMI) y genera recomendaciones.
-- **Alerta** por webhook o correo electrónico.
-- **Interfaz web moderna** (Vue 3) servida por el mismo proceso, junto con la API bajo `/api`.
+## Languages
 
-## Instalación rápida
+The web UI is available in **English and Spanish**. The language is detected automatically from your browser and can be switched at any time with the language selector in the UI. The server localizes DNS checks, recommendations, alerts and API errors per request (via the `x-locale` header). The language of **notifications** (webhook and email) is configurable in Settings (`language`: `en` or `es`, default `en`).
 
-**Proxmox (LXC) — un solo comando.** En la shell del host Proxmox, como root:
+## What it does
+
+- **Receives** aggregate (**rua**) and forensic (**ruf**) reports for one or more domains: **IMAP** mailbox polling, a **built-in SMTP receiver**, **HTTP ingest with a token**, or **manual upload** of files (XML, gz, zip, eml).
+- **Parses** every report and **enriches** source IPs with reverse DNS, ASN and country.
+- **Classifies** traffic into four categories: `pass`, `forwarded` (legitimate forwarding), `misaligned` and `fail`.
+- **Checks DNS** for each domain (DMARC, SPF, DKIM, MTA-STS, TLS-RPT and BIMI) and produces recommendations.
+- **Alerts** you through a webhook or email.
+- **Modern web UI** (Vue 3), bilingual (English and Spanish), served by the same process alongside the API under `/api` (port 8080).
+
+## Quick install
+
+**Proxmox (LXC): one command.** In the Proxmox host shell, as root:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main/deploy/proxmox/dmark-hole-lxc.sh)"
 ```
 
-Crea un contenedor Debian sin privilegios, instala DMARK-Hole como servicio y al final muestra la URL (`http://<ip-del-contenedor>:8080`). Abra esa URL y cree la cuenta de administrador.
+It creates an unprivileged Debian 12 (or 13) container, installs DMARK-Hole as a service and prints the URL when done (`http://<container-ip>:8080`). Open that URL and create the administrator account.
 
 **Docker:**
 
@@ -27,64 +35,64 @@ Crea un contenedor Debian sin privilegios, instala DMARK-Hole como servicio y al
 git clone https://github.com/NaturalDevCR/dmark-hole.git && cd dmark-hole && docker compose up -d
 ```
 
-**Debian / Ubuntu (VM, LXC existente o servidor):**
+**Debian / Ubuntu (VM, existing LXC or server):**
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main/deploy/install.sh)"
 ```
 
-Después de instalar: agregue sus dominios, configure cómo llegan los reportes (buzón IMAP, receptor SMTP o HTTP; ver [Cómo recibir los reportes](#cómo-recibir-los-reportes)) y publique el registro DMARC con `rua=` apuntando a esa dirección.
+After installing: add your domains, choose how reports reach DMARK-Hole (IMAP mailbox, SMTP receiver or HTTP; see [How to receive reports](#how-to-receive-reports)) and publish your DMARC record with `rua=` pointing to that address.
 
-## Instalación detallada
+## Detailed installation
 
-Requisitos: ninguno con Docker o los instaladores. Para ejecutar a mano: Node.js >= 22.13 (usa `node:sqlite`; se recomienda Node 24 LTS) y pnpm 10.
+Requirements: none with Docker or the installers. To run it by hand: Node.js >= 22.13 (it uses `node:sqlite`; Node 24 LTS is recommended) and pnpm 10.
 
-### Proxmox VE (contenedor LXC)
+### Proxmox VE (LXC container)
 
-El script se ejecuta **en el host Proxmox** como root:
+The script runs **on the Proxmox host** as root:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main/deploy/proxmox/dmark-hole-lxc.sh)"
 ```
 
-Qué hace, paso a paso:
+What it does, step by step:
 
-1. Verifica que es un host Proxmox (`pct`, `pveam`).
-2. Pregunta ID, nombre, almacenamiento, bridge, CPU/RAM/disco e IP (Enter acepta el valor por defecto).
-3. Descarga la plantilla Debian (12 por defecto) si no existe.
-4. Crea un contenedor **sin privilegios** con `nesting=1` e inicio automático, y lo arranca.
-5. Dentro del contenedor ejecuta `deploy/install.sh`: instala Node 24, clona este repositorio en `/opt/dmark-hole`, compila y registra el servicio systemd `dmark-hole`.
-6. Imprime la IP y la URL.
+1. Checks that it is running on a Proxmox host (`pct`, `pveam`).
+2. Asks for the ID, hostname, storage, bridge, CPU/RAM/disk and IP (press Enter to accept a default).
+3. Downloads the Debian template (12 by default) if it is not already present.
+4. Creates an **unprivileged** container with `nesting=1` and start-on-boot, then starts it.
+5. Runs `deploy/install.sh` inside the container: installs Node 24, clones this repository into `/opt/dmark-hole`, builds it and registers the `dmark-hole` systemd service.
+6. Prints the IP and the URL.
 
-Recursos por defecto: 1 CPU, 1 GB de RAM, 4 GB de disco (suficiente para decenas de dominios; aumente el disco si guarda muchos meses de reportes).
+Default resources: 1 core, 1 GB RAM, 4 GB disk (enough for dozens of domains; increase the disk if you keep many months of reports).
 
-Instalación desatendida (sin preguntas), por ejemplo con IP fija:
+Unattended install (no prompts), for example with a static IP:
 
 ```bash
 CTID=150 CT_HOSTNAME=dmarc STORAGE=local-lvm BRIDGE=vmbr0 IP=192.168.1.50/24 GATEWAY=192.168.1.1 NONINTERACTIVE=1 \
   bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main/deploy/proxmox/dmark-hole-lxc.sh)"
 ```
 
-| Variable | Por defecto | Descripción |
+| Variable | Default | Description |
 |---|---|---|
-| `CTID` | siguiente libre | ID del contenedor |
-| `CT_HOSTNAME` | `dmark-hole` | Nombre de host |
-| `STORAGE` | `local-lvm` / primero disponible | Almacenamiento del disco |
-| `TEMPLATE_STORAGE` | `local` | Almacenamiento de plantillas |
-| `BRIDGE` / `VLAN` | `vmbr0` / ninguna | Red |
-| `CORES` / `RAM` / `DISK` | `1` / `1024` (MB) / `4` (GB) | Recursos |
-| `IP` / `GATEWAY` / `DNS` | `dhcp` | IP en formato CIDR y puerta de enlace si es estática |
-| `DEBIAN_VERSION` | `12` | `12` o `13` |
-| `REPO_URL` / `REPO_BRANCH` | este repositorio / `main` | Para instalar desde un fork o una rama |
+| `CTID` | next free ID | Container ID |
+| `CT_HOSTNAME` | `dmark-hole` | Hostname |
+| `STORAGE` | `local-lvm` / first available | Storage for the container disk |
+| `TEMPLATE_STORAGE` | `local` | Storage for OS templates |
+| `BRIDGE` / `VLAN` | `vmbr0` / none | Network |
+| `CORES` / `RAM` / `DISK` | `1` / `1024` (MB) / `4` (GB) | Resources |
+| `IP` / `GATEWAY` / `DNS` | `dhcp` | IP in CIDR notation and gateway when static |
+| `DEBIAN_VERSION` | `12` | `12` or `13` |
+| `REPO_URL` / `REPO_BRANCH` | this repository / `main` | Install from a fork or a branch |
 
-¿Sin acceso a GitHub desde el contenedor? Copie el repositorio completo al host y ejecute el script desde ahí; empaqueta el código local y lo sube al contenedor:
+No GitHub access from the container? Copy the whole repository to the host and run the script from there. It packages the local code and pushes it into the container:
 
 ```bash
 scp -r dmark-hole root@proxmox:/root/
 ssh -t root@proxmox bash /root/dmark-hole/deploy/proxmox/dmark-hole-lxc.sh
 ```
 
-Para recibir reportes por el **receptor SMTP** en el LXC, redirija el puerto 25 del router/firewall a la IP del contenedor y defina `SMTP_PORT=25` en `/etc/dmark-hole/dmark-hole.env` (ver más abajo).
+To receive reports through the **SMTP receiver** in the LXC, forward port 25 on your router/firewall to the container's IP and set `SMTP_PORT=25` in `/etc/dmark-hole/dmark-hole.env` (see below).
 
 ### Docker
 
@@ -94,20 +102,20 @@ cd dmark-hole
 docker compose up -d
 ```
 
-La interfaz queda en `http://<host>:8080`. En el primer acceso, la página de configuración inicial crea el usuario administrador (o defina `ADMIN_EMAIL` / `ADMIN_PASSWORD`).
+The UI is available at `http://<host>:8080`. On first access, the initial setup page creates the administrator account (or set `ADMIN_EMAIL` / `ADMIN_PASSWORD`).
 
-- Los datos (SQLite y secreto generado) viven en el volumen `dmark-data`, montado en `/data`.
-- Personalice las variables en la sección `environment` de `docker-compose.yml`. El puerto 2525 solo se usa si activa el receptor SMTP.
+- Data (the SQLite database and the generated secret) lives in the `dmark-data` volume, mounted at `/data`.
+- Customize the variables in the `environment` section of `docker-compose.yml`. Port 2525 is only used if you enable the SMTP receiver.
 
 ### Debian / Ubuntu (systemd)
 
-En una VM, LXC o servidor con Debian 12/13 o Ubuntu 22.04/24.04, como root:
+On a VM, LXC or server running Debian 12/13 or Ubuntu 22.04/24.04, as root:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main/deploy/install.sh)"
 ```
 
-o desde una copia del repositorio:
+or from a clone of the repository:
 
 ```bash
 git clone https://github.com/NaturalDevCR/dmark-hole.git
@@ -115,148 +123,150 @@ cd dmark-hole
 ./deploy/install.sh
 ```
 
-El instalador es idempotente y:
+The installer is idempotent and:
 
-1. instala Node 24 (NodeSource) y habilita corepack/pnpm;
-2. crea el usuario de sistema `dmark`;
-3. instala la aplicación en `/opt/dmark-hole` y la compila (`pnpm install` + `pnpm build`);
-4. crea `/etc/dmark-hole/dmark-hole.env` (con `DATA_DIR=/var/lib/dmark-hole`);
-5. instala y arranca el servicio systemd `dmark-hole` y comprueba `/api/health`.
+1. installs Node 24 (NodeSource) and enables corepack/pnpm;
+2. creates the `dmark` system user;
+3. installs the application in `/opt/dmark-hole` and builds it (`pnpm install` + `pnpm build`);
+4. creates `/etc/dmark-hole/dmark-hole.env` (with `DATA_DIR=/var/lib/dmark-hole`);
+5. installs and starts the `dmark-hole` systemd service and checks `/api/health`.
 
-Comandos útiles:
+Useful commands:
 
 ```bash
 systemctl status dmark-hole
 journalctl -u dmark-hole -f
-systemctl restart dmark-hole   # tras editar /etc/dmark-hole/dmark-hole.env
+systemctl restart dmark-hole   # after editing /etc/dmark-hole/dmark-hole.env
 ```
 
-La unidad systemd tiene hardening (`ProtectSystem=strict`, `NoNewPrivileges`, etc.) y concede `CAP_NET_BIND_SERVICE`, de modo que puede usar `SMTP_PORT=25` directamente.
+The systemd unit is hardened (`ProtectSystem=strict`, `NoNewPrivileges`, etc.) and grants `CAP_NET_BIND_SERVICE`, so it can bind `SMTP_PORT=25` directly.
 
-## Actualización
+## Updating
 
-| Método | Procedimiento |
+| Method | Procedure |
 |---|---|
 | Docker | `git pull && docker compose up -d --build` |
-| LXC / systemd | `/opt/dmark-hole/deploy/install.sh --update` (dentro del contenedor) |
-| LXC desde el host | `pct exec <CTID> -- /opt/dmark-hole/deploy/install.sh --update` |
-| LXC sin acceso a GitHub | Copie la nueva versión al contenedor (`pct push` de un `.tar.gz` o `scp`), descomprímala y ejecute `./deploy/install.sh --update` desde esa carpeta |
+| LXC / systemd | `/opt/dmark-hole/deploy/install.sh --update` (inside the container) |
+| LXC from the host | `pct exec <CTID> -- /opt/dmark-hole/deploy/install.sh --update` |
+| LXC without GitHub access | Copy the new version into the container (`pct push` a `.tar.gz`, or `scp`), extract it and run `./deploy/install.sh --update` from that folder |
 
-`--update` hace `git pull` (o sincroniza el checkout local), reconstruye y reinicia el servicio. La configuración y los datos no se tocan. Haz una copia de seguridad antes de actualizar (ver más abajo).
+`--update` runs `git pull` (or syncs the local checkout), rebuilds and restarts the service. Your configuration and data are left untouched. Take a backup before updating (see [Backups](#backups)).
 
-## Configuración
+## Configuration
 
-Todas las variables son opcionales. Ver [`.env.example`](.env.example). En systemd se editan en `/etc/dmark-hole/dmark-hole.env`; en Docker, en `docker-compose.yml`.
+All variables are optional. See [`.env.example`](.env.example). With systemd, edit them in `/etc/dmark-hole/dmark-hole.env`; with Docker, in `docker-compose.yml`.
 
-| Variable | Por defecto | Descripción |
+| Variable | Default | Description |
 |---|---|---|
-| `DATA_DIR` | `./data` (Docker: `/data`) | Base de datos SQLite y secreto generado |
-| `PORT` | `8080` | Puerto HTTP (UI + API) |
-| `HOST` | `0.0.0.0` | Dirección de escucha |
-| `SECRET_KEY` | autogenerada | Firma de sesiones y cifrado de credenciales (>= 32 caracteres). Si falta se genera en `DATA_DIR/.secret` |
-| `LOG_LEVEL` | `info` | Nivel de log |
-| `TRUST_PROXY` | `false` | `true` si hay un proxy inverso delante |
-| `SECURE_COOKIES` | `false` | `true` si sirves por HTTPS |
-| `WEB_DIST` | incluido | Ruta de la interfaz compilada |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | vacío | Administrador inicial; si faltan, se usa la página de configuración inicial |
-| `SMTP_ENABLED` | `false` | Valor inicial del receptor SMTP integrado; una vez guardada la configuración desde la UI, manda la UI |
-| `SMTP_ALLOWED_RECIPIENTS` | vacío | Destinatarios aceptados por el receptor SMTP, separados por comas (`dmarc@reports.example.com`, `@reports.example.com`). **Obligatorio**: sin lista, el receptor rechaza todo. Editable en la UI |
-| `SMTP_PORT` | `2525` | Puerto del receptor SMTP |
-| `SMTP_LISTEN_HOST` | `0.0.0.0` | Dirección de escucha SMTP |
-| `SMTP_MAX_SIZE_MB` | `25` | Tamaño máximo de mensaje |
-| `SMTP_TLS_KEY` / `SMTP_TLS_CERT` | vacío | Rutas a clave y certificado PEM para STARTTLS |
-| `DISABLE_SCHEDULER` | `false` | Desactiva tareas programadas (IMAP, DNS, alertas) |
+| `DATA_DIR` | `./data` (Docker: `/data`) | SQLite database and generated secret |
+| `PORT` | `8080` | HTTP port (UI + API) |
+| `HOST` | `0.0.0.0` | Listen address |
+| `SECRET_KEY` | auto-generated | Signs sessions and encrypts stored credentials (>= 32 characters). If unset, it is generated in `DATA_DIR/.secret` |
+| `LOG_LEVEL` | `info` | Log level |
+| `TRUST_PROXY` | `false` | `true` when behind a reverse proxy |
+| `SECURE_COOKIES` | `false` | `true` when served over HTTPS |
+| `WEB_DIST` | bundled | Path to the built web UI |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | empty | Initial administrator; if unset, the first-run setup page is used |
+| `SMTP_ENABLED` | `false` | Initial value for the built-in SMTP receiver; once the settings are saved from the UI, the UI value wins |
+| `SMTP_ALLOWED_RECIPIENTS` | empty | Recipients accepted by the SMTP receiver, comma separated (`dmarc@reports.example.com`, `@reports.example.com`). **Required**: without a list, the receiver rejects everything. Editable in the UI |
+| `SMTP_PORT` | `2525` | SMTP receiver port |
+| `SMTP_LISTEN_HOST` | `0.0.0.0` | SMTP listen address |
+| `SMTP_MAX_SIZE_MB` | `25` | Maximum message size |
+| `SMTP_TLS_KEY` / `SMTP_TLS_CERT` | empty | Paths to a PEM key and certificate for STARTTLS |
+| `DISABLE_SCHEDULER` | `false` | Disables scheduled tasks (IMAP, DNS, alerts) |
 
-Detrás de un proxy HTTPS (Caddy, Traefik, nginx): apunta al puerto 8080 y define `TRUST_PROXY=true` y `SECURE_COOKIES=true`.
+Behind an HTTPS reverse proxy (Caddy, Traefik, nginx): point it at port 8080 and set `TRUST_PROXY=true` and `SECURE_COOKIES=true`.
 
-Comprobación de salud: `GET /api/health` devuelve 200 con JSON.
+The notification language (`language`: `en` | `es`, default `en`) is not an environment variable: change it in Settings in the UI.
 
-## Cómo recibir los reportes
+Health check: `GET /api/health` returns 200 with JSON.
 
-### 1. Publica el registro DMARC
+## How to receive reports
 
-En el DNS de cada dominio a monitorizar:
+### 1. Publish the DMARC record
+
+In the DNS of each domain you want to monitor:
 
 ```
 _dmarc.example.com.  TXT  "v=DMARC1; p=none; rua=mailto:dmarc@yourdomain"
 ```
 
-`p=none` solo observa: es el punto de partida recomendado. Añade `ruf=mailto:...` si quieres reportes forenses (pocos proveedores los envían). DMARK-Hole te recomendará cuándo pasar a `quarantine` o `reject`.
+`p=none` only observes, so it is the recommended starting point. Add `ruf=mailto:...` if you want forensic reports (few providers send them). DMARK-Hole will tell you when it is safe to move to `quarantine` or `reject`.
 
-### Autorización de destino externo
+### External destination authorization
 
-Si la dirección `rua` está en **otro dominio** distinto del monitorizado (por ejemplo `rua=mailto:dmarc@receiver.com` para `example.com`), el dominio receptor debe autorizarlo con este registro TXT:
+If the `rua` address is in a **different domain** than the one being monitored (for example `rua=mailto:dmarc@receiver.com` for `example.com`), the receiving domain must authorize it with this TXT record:
 
 ```
 example.com._report._dmarc.receiver.com.  TXT  "v=DMARC1"
 ```
 
-Sin él, los proveedores no enviarán los reportes. Puedes usar un comodín: `*._report._dmarc.receiver.com TXT "v=DMARC1"`.
+Without it, providers will not send the reports. You can use a wildcard: `*._report._dmarc.receiver.com TXT "v=DMARC1"`.
 
-### Opción A: buzón dedicado + IMAP
+### Option A: dedicated mailbox + IMAP
 
-Crea un buzón (p. ej. `dmarc@yourdomain`) en tu proveedor de correo, usa esa dirección en `rua` y añade el buzón en DMARK-Hole (servidor IMAP, usuario y contraseña; se guardan cifrados). La aplicación lo consulta periódicamente e importa los reportes adjuntos. Es la opción más sencilla si ya tienes correo.
+Create a mailbox (e.g. `dmarc@yourdomain`) with your mail provider, use that address in `rua`, and add the mailbox in DMARK-Hole (IMAP server, username and password; they are stored encrypted). The application polls it periodically and imports the attached reports. This is the simplest option if you already have email.
 
-### Opción B: receptor SMTP integrado
+### Option B: built-in SMTP receiver
 
-DMARK-Hole recibe el correo directamente, sin buzón intermedio.
+DMARK-Hole receives the mail directly, with no intermediate mailbox.
 
-1. Activa `SMTP_ENABLED=true` (o desde la interfaz) y define los destinatarios permitidos (`SMTP_ALLOWED_RECIPIENTS` o Ingesta → Receptor SMTP). Sin ellos el receptor rechaza todo el correo, para que nadie pueda inyectar reportes falsos.
-2. Crea un registro **MX** para un dominio o subdominio de reportes apuntando al host, p. ej. `reports.example.com. MX 10 dmark.example.com.`, y un registro A/AAAA para `dmark.example.com`.
-3. Usa `rua=mailto:dmarc@reports.example.com`. Si es un dominio distinto al monitorizado, añade el registro de autorización descrito arriba.
-4. Puertos: el servicio escucha en `SMTP_PORT` (2525 por defecto). El correo entrante llega al **25**, así que:
-   - Docker: publica `"25:2525"` en `docker-compose.yml`.
-   - systemd: define `SMTP_PORT=25` (la unidad ya concede `CAP_NET_BIND_SERVICE`) o redirige 25 → 2525 con nftables/iptables.
-   - LXC/Proxmox: abre el 25 en el firewall del host y redirige hacia la IP del contenedor.
-5. **Firewall**: abre el puerto 25/TCP entrante desde Internet. Muchos ISP bloquean el 25 entrante en conexiones residenciales; comprueba con tu proveedor.
-6. Opcional: define `SMTP_TLS_KEY` y `SMTP_TLS_CERT` para ofrecer STARTTLS.
+1. Enable `SMTP_ENABLED=true` (or turn it on in the UI) and set the allowed recipients (`SMTP_ALLOWED_RECIPIENTS`, or Ingest → SMTP receiver). Without them the receiver rejects all mail, so nobody can inject fake reports.
+2. Create an **MX** record for a reports domain or subdomain pointing to the host, e.g. `reports.example.com. MX 10 dmark.example.com.`, plus an A/AAAA record for `dmark.example.com`.
+3. Use `rua=mailto:dmarc@reports.example.com`. If it is a different domain from the monitored one, add the authorization record described above.
+4. Ports: the service listens on `SMTP_PORT` (2525 by default). Incoming mail arrives on port **25**, so:
+   - Docker: publish `"25:2525"` in `docker-compose.yml`.
+   - systemd: set `SMTP_PORT=25` (the unit already grants `CAP_NET_BIND_SERVICE`) or redirect 25 → 2525 with nftables/iptables.
+   - LXC/Proxmox: open port 25 on the host firewall and forward it to the container's IP.
+5. **Firewall**: allow inbound 25/TCP from the Internet. Many ISPs block inbound port 25 on residential connections; check with your provider.
+6. Optional: set `SMTP_TLS_KEY` and `SMTP_TLS_CERT` to offer STARTTLS.
 
-El receptor solo debe exponerse para reportes: no envía correo ni actúa como relay.
+The receiver should only be exposed for reports: it does not send mail or act as a relay.
 
-### Opción C: HTTP (scripts, pipes de Postfix, webhooks)
+### Option C: HTTP (scripts, Postfix pipes, webhooks)
 
-Cada instancia tiene un token de ingesta (Ingesta → API / HTTP en la interfaz). Cualquier formato aceptado (`.xml`, `.gz`, `.zip`, `.eml`) se puede enviar así:
+Every instance has an ingest token (Ingest → API / HTTP in the UI). Any supported format (`.xml`, `.gz`, `.zip`, `.eml`) can be sent this way:
 
 ```bash
 curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/gzip" \
-  --data-binary @reporte.xml.gz http://<host>:8080/api/ingest/raw
+  --data-binary @report.xml.gz http://<host>:8080/api/ingest/raw
 ```
 
-Útil, por ejemplo, con un alias de Postfix `dmarc: "|curl -s -X POST -H 'Authorization: Bearer <token>' --data-binary @- http://127.0.0.1:8080/api/ingest/raw"`.
+Handy, for example, with a Postfix alias: `dmarc: "|curl -s -X POST -H 'Authorization: Bearer <token>' --data-binary @- http://127.0.0.1:8080/api/ingest/raw"`.
 
-### Subida manual
+### Manual upload
 
-En la interfaz puedes subir archivos `.xml`, `.gz`, `.zip` o `.eml` de reportes para importarlos sin configurar nada.
+In the UI you can upload `.xml`, `.gz`, `.zip` or `.eml` report files to import them without configuring anything.
 
-## Cómo analiza los reportes
+## How the analysis works
 
-Cada registro de un reporte agregado (una IP de origen + resultados de autenticación + número de mensajes) se procesa así:
+Each record in an aggregate report (a source IP + authentication results + message count) is processed as follows:
 
-1. **Alineación**: se recalcula a partir de `auth_results` usando el modo publicado (`adkim`/`aspf`, relajado o estricto) y el dominio organizacional según la Public Suffix List. SPF solo cuenta si es del `MAIL FROM`.
-2. **Resultado DMARC**: se respeta la evaluación del receptor (`policy_evaluated`); pasa si SPF **o** DKIM pasan alineados.
-3. **Clasificación** del tráfico:
+1. **Alignment**: recomputed from `auth_results` using the published mode (`adkim`/`aspf`, relaxed or strict) and the organizational domain according to the Public Suffix List. SPF only counts if it is for the `MAIL FROM`.
+2. **DMARC result**: the receiver's evaluation (`policy_evaluated`) is respected; it passes if SPF **or** DKIM pass aligned.
+3. **Traffic classification**:
 
-| Categoría | Significado | Qué hacer |
+| Category | Meaning | What to do |
 |---|---|---|
-| **Autenticado** (`pass`) | Pasa DMARC con SPF y/o DKIM alineado | Nada |
-| **Reenviado** (`forwarded`) | Reenvíos y listas de correo: DKIM alineado sobrevive pero SPF de su propio dominio falla, o el receptor indica `forwarded`/`mailing_list`/`trusted_forwarder` | Normalmente nada; asegúrese de firmar todo con DKIM |
-| **Sin alinear** (`misaligned`) | SPF o DKIM pasan, pero para **otro dominio** (p. ej. `sendgrid.net`). Casi siempre un servicio legítimo mal configurado | Configure DKIM personalizado / Return-Path propio en ese servicio antes de endurecer la política |
-| **No autenticado** (`fail`) | Ni SPF ni DKIM pasan | Suplantación o un servidor propio no declarado |
+| **Authenticated** (`pass`) | Passes DMARC with aligned SPF and/or DKIM | Nothing |
+| **Forwarded** (`forwarded`) | Forwarding and mailing lists: aligned DKIM survives but SPF for your own domain fails, or the receiver reports `forwarded`/`mailing_list`/`trusted_forwarder` | Usually nothing; make sure everything is DKIM-signed |
+| **Misaligned** (`misaligned`) | SPF or DKIM pass, but for **another domain** (e.g. `sendgrid.net`). Almost always a legitimate service that is not fully configured | Set up custom DKIM / your own Return-Path in that service before tightening your policy |
+| **Unauthenticated** (`fail`) | Neither SPF nor DKIM pass | Spoofing, or one of your own servers that is not declared |
 
-4. **Enriquecimiento de IPs**: DNS inverso (PTR), ASN y país vía DNS de Team Cymru (sin APIs externas ni claves). Con PTR, ASN y los dominios de firma se detecta el **proveedor** (Google, Microsoft 365, Amazon SES, SendGrid, Mailchimp, Mailgun, Zoho, Salesforce, HubSpot, etc.) y las IPs se agrupan por servicio.
-5. **Estado de cada fuente**: *Autorizado* (≥90 % autenticado), *Reenviador*, *Requiere configuración* (mayoría sin alinear), *Sospechoso* (mayoría no autenticado) o *Mixto*.
-6. **Salud del dominio** (0–100): 60 % cumplimiento DMARC de los últimos 30 días + 40 % puntuación DNS (DMARC, política, rua, SPF y su límite de 10 consultas, claves DKIM y su tamaño, MTA-STS, TLS-RPT).
-7. **Recomendaciones** priorizadas: registros ausentes o inválidos, SPF con más de 10 consultas, claves DKIM débiles o selectores no publicados, servicios a alinear, destinos `rua` externos sin autorizar y **cuándo es seguro subir a `quarantine` / `reject`** (con el registro sugerido listo para copiar).
+4. **IP enrichment**: reverse DNS (PTR), ASN and country via Team Cymru DNS (no external APIs or keys). From PTR, ASN and signing domains, the **provider** is detected (Google, Microsoft 365, Amazon SES, SendGrid, Mailchimp, Mailgun, Zoho, Salesforce, HubSpot, etc.) and IPs are grouped by service.
+5. **Source status**: *Authorized* (>= 90% authenticated), *Forwarder*, *Needs setup* (mostly misaligned), *Suspicious* (mostly unauthenticated) or *Mixed*.
+6. **Domain health** (0-100): 60% DMARC compliance over the last 30 days + 40% DNS score (DMARC, policy, rua, SPF and its 10-lookup limit, DKIM keys and their size, MTA-STS, TLS-RPT).
+7. **Prioritized recommendations**: missing or invalid records, SPF with more than 10 lookups, weak DKIM keys or unpublished selectors, services to align, unauthorized external `rua` destinations, and **when it is safe to move to `quarantine` / `reject`** (with the suggested record ready to copy).
 
-Alertas automáticas: nueva IP que envía correo no autenticado, caída del cumplimiento diario bajo el umbral, cambios en los registros DNS y llegada de reportes forenses. Se notifican por webhook (Slack, Discord, Teams o JSON genérico) y/o correo, más un resumen semanal opcional.
+Automatic alerts: a new IP sending unauthenticated mail, daily compliance dropping below the threshold, DNS record changes and the arrival of forensic reports. They are delivered by webhook (Slack, Discord, Teams or generic JSON) and/or email, plus an optional weekly digest.
 
-Los reportes forenses (RUF) contienen datos personales (cabeceras de mensajes reales); se guardan aparte y se eliminan tras `forensicRetentionDays` (30 días por defecto).
+Forensic reports (RUF) contain personal data (headers of real messages); they are stored separately and deleted after `forensicRetentionDays` (30 days by default).
 
-## Copias de seguridad
+## Backups
 
-Todo el estado está en `DATA_DIR` (base de datos SQLite y `.secret`). Conserva ambos: sin `.secret` (o `SECRET_KEY`) no se pueden descifrar las credenciales IMAP guardadas.
+All state lives in `DATA_DIR` (the SQLite database and `.secret`). Keep both: without `.secret` (or `SECRET_KEY`), the stored IMAP credentials cannot be decrypted.
 
-Copia simple, con el servicio parado:
+Simple copy, with the service stopped:
 
 ```bash
 systemctl stop dmark-hole
@@ -264,51 +274,51 @@ cp -a /var/lib/dmark-hole /backup/dmark-hole-$(date +%F)
 systemctl start dmark-hole
 ```
 
-Copia en caliente y consistente con el backup de SQLite:
+Consistent hot backup using SQLite's backup command:
 
 ```bash
 sqlite3 /var/lib/dmark-hole/dmark-hole.db ".backup '/backup/dmark-hole-$(date +%F).db'"
 cp /var/lib/dmark-hole/.secret /backup/
 ```
 
-En Docker:
+With Docker:
 
 ```bash
 docker run --rm -v dmark-hole_dmark-data:/data -v "$PWD":/backup alpine \
   tar czf /backup/dmark-data-$(date +%F).tgz -C /data .
 ```
 
-(el nombre real del volumen es `<proyecto>_dmark-data`; consúltalo con `docker volume ls`.) Para restaurar, detén el servicio y devuelve los archivos a `DATA_DIR`.
+(The actual volume name is `<project>_dmark-data`; check it with `docker volume ls`.) To restore, stop the service and put the files back into `DATA_DIR`.
 
-## Desarrollo
+## Development
 
-Requisitos: Node >= 22.13 y pnpm 10 (`corepack enable`).
+Requirements: Node >= 22.13 and pnpm 10 (`corepack enable`).
 
 ```bash
 pnpm install
-cp .env.example .env   # opcional
-pnpm dev               # servidor en :8080 y web (Vite) en :5173
+cp .env.example .env   # optional
+pnpm dev               # server on :8080 and web (Vite) on :5173
 ```
 
-`pnpm dev` arranca ambos paquetes; la web en `http://localhost:5173` redirige `/api` al servidor en el puerto 8080 (cambie el destino con `API_URL`).
+`pnpm dev` starts both packages; the web app at `http://localhost:5173` proxies `/api` to the server on port 8080 (change the target with `API_URL`).
 
-Datos de demostración (genera reportes realistas para probar la interfaz; no usar en producción):
+Demo data (generates realistic reports to try out the UI; do not use in production):
 
 ```bash
 DATA_DIR=./data pnpm --filter @dmark-hole/server demo -- --days 60
 ```
 
-Otros comandos:
+Other commands:
 
 ```bash
-pnpm build      # compila web (packages/web/dist) y servidor (packages/server/dist)
+pnpm build      # builds web (packages/web/dist) and server (packages/server/dist)
 pnpm start      # node packages/server/dist/index.js
-pnpm test       # pruebas del servidor
+pnpm test       # server tests
 pnpm typecheck
 ```
 
-Estructura: `packages/server` (`@dmark-hole/server`, Fastify + `node:sqlite`) y `packages/web` (`@dmark-hole/web`, Vue 3 + Vite). En producción el servidor sirve la SPA compilada y la API bajo `/api`.
+Layout: `packages/server` (`@dmark-hole/server`, Fastify + `node:sqlite`) and `packages/web` (`@dmark-hole/web`, Vue 3 + Vite). In production the server serves the built SPA and the API under `/api`.
 
-## Licencia
+## License
 
-[MIT](LICENSE): puede usarlo, modificarlo y redistribuirlo libremente, incluso con fines comerciales, manteniendo el aviso de copyright.
+[MIT](LICENSE): you may use, modify and redistribute it freely, including commercially, as long as you keep the copyright notice.

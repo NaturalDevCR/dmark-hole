@@ -4,6 +4,7 @@ import { overview, defaultRange } from "./analysis/stats.js";
 import { checkDueDomains } from "./dns/service.js";
 import { enrichBacklog } from "./enrich/ip.js";
 import { pollDueMailboxes } from "./ingest/imap.js";
+import { t } from "./i18n/index.js";
 import { logger } from "./lib/logger.js";
 import { getSettings } from "./settings.js";
 
@@ -54,13 +55,14 @@ async function weeklyDigest() {
   if (!getSettings().notifications.weeklyDigest || now.getDay() !== 1 || now.getHours() < 8 || getMarker("digest") === week) return;
   setMarker("digest", week);
   const range = defaultRange(7);
+  const locale = getSettings().language;
   const lines: string[] = [];
   for (const d of db.all<{ id: number; name: string }>("SELECT id, name FROM domains ORDER BY name")) {
     const o = overview({ domainId: d.id, ...range });
     if (!o.messages) continue;
-    lines.push(`• ${d.name}: ${o.messages.toLocaleString()} mensajes, ${o.compliance}% DMARC, ${o.categories.fail.toLocaleString()} no autenticados`);
+    lines.push(`• ${t(locale, "alert.digest.line", { domain: d.name, messages: o.messages, compliance: o.compliance, fail: o.categories.fail })}`);
   }
-  if (lines.length) await notify("Resumen semanal DMARC", lines.join("\n"), "info");
+  if (lines.length) await notify(t(locale, "alert.digest.title"), lines.join("\n"), "info");
 }
 
 async function daily() {

@@ -4,6 +4,8 @@ import { db } from "./db/index.js";
 import { decrypt, encrypt } from "./lib/crypto.js";
 
 export const settingsSchema = z.object({
+  /** Language for notifications, digests and anything generated without a request. */
+  language: z.enum(["en", "es"]),
   /** Create domains automatically when a report arrives for an unknown policy_domain. */
   autoCreateDomains: z.boolean(),
   /** Keep the raw XML of every report (compressed) so it can be downloaded later. */
@@ -51,6 +53,7 @@ export const settingsSchema = z.object({
 export type Settings = z.infer<typeof settingsSchema>;
 
 export const defaultSettings: Settings = {
+  language: "en",
   autoCreateDomains: true,
   storeRawXml: true,
   retentionDays: 365,

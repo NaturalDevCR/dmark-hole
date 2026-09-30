@@ -27,19 +27,33 @@ vi.mock("node:dns/promises", () => {
   return { Resolver };
 });
 
-const { runDnsChecks } = await import("../src/dns/checks.js");
+const { runDnsChecks, localizeDnsReport } = await import("../src/dns/checks.js");
 
 describe("SPF analysis", () => {
   it("counts CIDR-only mechanisms and every include occurrence (RFC 7208)", async () => {
     const r = await runDnsChecks("example.test");
     // a/24 + mx/24 + include:shared + include:branch + (branch → include:shared) = 5
     expect(r.spf.lookups).toBe(5);
-    expect(r.spf.checks.some((c) => /Bucle/.test(c.title))).toBe(false);
+    expect(r.spf.checks.some((c) => c.code.includes("loop"))).toBe(false);
     expect(r.inconclusive).toBe(false);
   });
 
   it("detects include loops", async () => {
     const r = await runDnsChecks("loop.test");
-    expect(JSON.stringify(r.spf.tree)).toContain("Bucle de includes");
+    expect(JSON.stringify(r.spf.tree)).toContain('"errorCode":"loop"');
+    expect(r.spf.checks.some((c) => c.code === "spf.include.loop")).toBe(true);
+    // Producers emit codes only; text is rendered per locale.
+    expect(r.spf.checks.every((c) => c.title === undefined)).toBe(true);
+  });
+
+  it("localizes checks and SPF tree errors without mutating the stored report", async () => {
+    const r = await runDnsChecks("loop.test");
+    const en = localizeDnsReport(r, "en");
+    const es = localizeDnsReport(r, "es");
+    expect(en.spf.checks.find((c) => c.code === "spf.lookups")?.title).toBe(`DNS lookups: ${r.spf.lookups}/10`);
+    expect(es.spf.checks.find((c) => c.code === "spf.lookups")?.title).toBe(`Consultas DNS: ${r.spf.lookups}/10`);
+    expect(en.spf.checks.find((c) => c.code === "spf.include.loop")?.title).toBe("include:loop.test — Include loop");
+    expect(es.spf.tree?.children[0]?.error).toBe("Bucle de includes");
+    expect(r.spf.checks[0]?.title).toBeUndefined();
   });
 });
