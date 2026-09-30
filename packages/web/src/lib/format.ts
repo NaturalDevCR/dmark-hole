@@ -6,7 +6,7 @@ const compact = new Intl.NumberFormat("es", { notation: "compact", maximumFracti
 export const num = (n: number | null | undefined) => (n === null || n === undefined ? "—" : nf.format(n));
 export const short = (n: number | null | undefined) => (n === null || n === undefined ? "—" : n < 10000 ? nf.format(n) : compact.format(n));
 export const pct = (n: number | null | undefined, digits = 1) =>
-  n === null || n === undefined ? "—" : `${n.toLocaleString("es", { maximumFractionDigits: digits, minimumFractionDigits: n % 1 === 0 ? 0 : 1 })}%`;
+  n === null || n === undefined ? "—" : `${n.toLocaleString("es", { maximumFractionDigits: digits, minimumFractionDigits: n % 1 === 0 ? 0 : Math.min(1, digits) })}%`;
 export const ratio = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : null);
 
 export function date(ts: number | null | undefined, withTime = false) {
@@ -17,6 +17,18 @@ export function date(ts: number | null | undefined, withTime = false) {
     day: "numeric",
     ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
   });
+}
+
+/**
+ * Aggregate report windows are defined in UTC (usually 00:00–23:59:59), so
+ * they are shown in UTC to avoid a single day looking like two.
+ */
+export function period(begin: number, end: number, withTime = false) {
+  const opts: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric", timeZone: "UTC", ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}) };
+  const b = new Date(begin * 1000).toLocaleString("es", opts);
+  // end_ts is inclusive (…:59:59); subtract a second so a full day stays one day.
+  const e = new Date(Math.max(begin, end - 1) * 1000).toLocaleString("es", opts);
+  return `${b === e ? b : `${b} – ${e}`}${withTime ? " UTC" : ""}`;
 }
 
 export function day(iso: string) {

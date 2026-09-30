@@ -1,13 +1,14 @@
 import { BarChart, LineChart, PieChart } from "echarts/charts";
 import { GridComponent, LegendComponent, TooltipComponent } from "echarts/components";
 import { use } from "echarts/core";
+import { LegacyGridContainLabel } from "echarts/features";
 import { SVGRenderer } from "echarts/renderers";
 import { storeToRefs } from "pinia";
 import { computed } from "vue";
 import { useTheme } from "@/stores/theme";
 import type { Category } from "./types";
 
-use([BarChart, LineChart, PieChart, GridComponent, TooltipComponent, LegendComponent, SVGRenderer]);
+use([BarChart, LineChart, PieChart, GridComponent, TooltipComponent, LegendComponent, SVGRenderer, LegacyGridContainLabel]);
 
 function cssVar(name: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();

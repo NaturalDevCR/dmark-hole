@@ -12,10 +12,12 @@ const props = defineProps<{
   deltaSuffix?: string;
   /** When true, a negative delta is good (e.g. failures going down). */
   invert?: boolean;
+  /** Direction carries no judgement (e.g. number of sources). */
+  neutral?: boolean;
   tone?: "pass" | "forwarded" | "misaligned" | "fail" | "brand";
 }>();
 
-const good = computed(() => (props.delta ?? 0) === 0 ? null : ((props.delta ?? 0) > 0) !== !!props.invert);
+const good = computed(() => (props.neutral || (props.delta ?? 0) === 0 ? null : (props.delta ?? 0) > 0 !== !!props.invert));
 const toneBg: Record<string, string> = {
   pass: "bg-pass-soft text-pass",
   forwarded: "bg-forwarded-soft text-forwarded",

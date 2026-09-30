@@ -72,8 +72,9 @@ export function registerAuthHook(app: FastifyInstance) {
     req.user = userFromRequest(req);
     if (PUBLIC.has(path)) return;
     if (!req.user) throw new HttpError(401, "Not authenticated");
-    // Viewers are read-only.
-    if (req.method !== "GET" && req.user.role !== "admin" && !path.startsWith("/api/auth/")) {
+    // Viewers are read-only (besides their own session and acknowledging alerts).
+    const viewerWritable = path.startsWith("/api/auth/") || /^\/api\/alerts\/(\d+\/read|read-all)$/.test(path);
+    if (req.method !== "GET" && req.user.role !== "admin" && !viewerWritable) {
       throw new HttpError(403, "Admin role required");
     }
   });

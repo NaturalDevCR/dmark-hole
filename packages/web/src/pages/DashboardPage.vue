@@ -93,7 +93,7 @@ const sortedDomains = computed(() => [...(data.value?.domains ?? [])].sort((a, b
           delta-suffix=" pp"
           :hint="`SPF ${pct(ov.spfAlignedRate)} · DKIM ${pct(ov.dkimAlignedRate)} alineados`"
         />
-        <Stat label="Fuentes de envío" :value="num(ov.sources)" :icon="Network" tone="forwarded" :delta="change(ov.sources, ov.previous.sources)" :hint="`${num(ov.reports)} reportes`" />
+        <Stat label="Fuentes de envío" :value="num(ov.sources)" :icon="Network" tone="forwarded" neutral :delta="change(ov.sources, ov.previous.sources)" :hint="`${num(ov.reports)} reportes`" />
         <Stat
           label="No autenticados"
           :value="short(ov.categories.fail)"

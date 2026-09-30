@@ -266,7 +266,7 @@ export async function dataRoutes(app: FastifyInstance) {
 
   // ------------------------------------------------------------------- alerts
   app.get("/api/alerts", async (req) => {
-    const q = pageQuery.extend({ unread: z.coerce.boolean().optional(), domainId: z.coerce.number().int().optional() }).parse(req.query);
+    const q = pageQuery.extend({ unread: z.enum(["1", "true", "0", "false"]).transform((v) => v === "1" || v === "true").optional(), domainId: z.coerce.number().int().optional() }).parse(req.query);
     const where: string[] = ["1=1"];
     const params: (number | null)[] = [];
     if (q.unread) where.push("a.read_at IS NULL");
