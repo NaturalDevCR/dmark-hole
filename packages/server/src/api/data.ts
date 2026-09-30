@@ -174,7 +174,7 @@ export async function dataRoutes(app: FastifyInstance) {
     const w = where.join(" AND ");
     return paginate(
       `SELECT rp.id, rp.domain_id domainId, d.name domain, rp.org_name orgName, rp.org_email orgEmail, rp.report_id reportId,
-         rp.begin_ts beginTs, rp.end_ts endTs, rp.p, rp.sp, rp.pct, rp.message_count messages, rp.pass_count pass, rp.record_count records,
+         rp.begin_ts beginTs, rp.end_ts endTs, rp.p, rp.sp, rp.pct, rp.message_count messages, rp.pass_count pass, rp.record_count recordCount,
          rp.source, rp.received_at receivedAt
        FROM reports rp JOIN domains d ON d.id = rp.domain_id WHERE ${w} ORDER BY rp.begin_ts DESC, rp.id DESC`,
       `SELECT COUNT(*) n FROM reports rp WHERE ${w}`,
@@ -192,7 +192,7 @@ export async function dataRoutes(app: FastifyInstance) {
       `SELECT rp.id, rp.domain_id domainId, d.name domain, rp.org_name orgName, rp.org_email orgEmail, rp.extra_contact extraContact,
          rp.report_id reportId, rp.begin_ts beginTs, rp.end_ts endTs, rp.policy_domain policyDomain, rp.p, rp.sp, rp.np, rp.pct,
          rp.adkim, rp.aspf, rp.fo, rp.testing, rp.version, rp.errors, rp.source, rp.received_at receivedAt,
-         rp.message_count messages, rp.pass_count pass, rp.record_count records, rp.raw_xml IS NOT NULL hasXml
+         rp.message_count messages, rp.pass_count pass, rp.record_count recordCount, rp.raw_xml IS NOT NULL hasXml
        FROM reports rp JOIN domains d ON d.id = rp.domain_id WHERE rp.id = ?`,
       [id],
     );

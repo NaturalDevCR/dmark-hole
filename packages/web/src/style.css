@@ -1,0 +1,173 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Design tokens. Surfaces are layered: bg (page) < surface (cards) < raised (popovers).
+ * Semantic DMARC colors are shared by charts and badges so a category always reads the same.
+ */
+@theme {
+  --font-sans: "Inter var", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --color-bg: var(--c-bg);
+  --color-surface: var(--c-surface);
+  --color-raised: var(--c-raised);
+  --color-subtle: var(--c-subtle);
+  --color-line: var(--c-line);
+  --color-line-strong: var(--c-line-strong);
+  --color-fg: var(--c-fg);
+  --color-muted: var(--c-muted);
+  --color-faint: var(--c-faint);
+
+  --color-brand: var(--c-brand);
+  --color-brand-fg: var(--c-brand-fg);
+  --color-brand-soft: var(--c-brand-soft);
+
+  --color-pass: var(--c-pass);
+  --color-forwarded: var(--c-forwarded);
+  --color-misaligned: var(--c-misaligned);
+  --color-fail: var(--c-fail);
+  --color-pass-soft: var(--c-pass-soft);
+  --color-forwarded-soft: var(--c-forwarded-soft);
+  --color-misaligned-soft: var(--c-misaligned-soft);
+  --color-fail-soft: var(--c-fail-soft);
+}
+
+:root {
+  --c-bg: #f6f7f9;
+  --c-surface: #ffffff;
+  --c-raised: #ffffff;
+  --c-subtle: #f1f3f6;
+  --c-line: #e4e7ec;
+  --c-line-strong: #d0d5dd;
+  --c-fg: #101828;
+  --c-muted: #475467;
+  --c-faint: #98a2b3;
+
+  --c-brand: #4f46e5;
+  --c-brand-fg: #ffffff;
+  --c-brand-soft: #eef2ff;
+
+  --c-pass: #12b76a;
+  --c-forwarded: #2e90fa;
+  --c-misaligned: #f79009;
+  --c-fail: #f04438;
+  --c-pass-soft: #ecfdf3;
+  --c-forwarded-soft: #eff8ff;
+  --c-misaligned-soft: #fffaeb;
+  --c-fail-soft: #fef3f2;
+
+  /* Chart fills (validated with the dataviz palette checker for each mode). */
+  --c-series-pass: #12b76a;
+  --c-series-forwarded: #2e90fa;
+  --c-series-misaligned: #f79009;
+  --c-series-fail: #f04438;
+}
+
+.dark {
+  --c-bg: #0b0d12;
+  --c-surface: #12151c;
+  --c-raised: #181c25;
+  --c-subtle: #1a1f2a;
+  --c-line: #232937;
+  --c-line-strong: #2f3748;
+  --c-fg: #eef0f4;
+  --c-muted: #a3acbd;
+  --c-faint: #6b7489;
+
+  --c-brand: #818cf8;
+  --c-brand-fg: #0b0d12;
+  --c-brand-soft: #1e1f3b;
+
+  --c-pass: #32d583;
+  --c-forwarded: #53b1fd;
+  --c-misaligned: #fdb022;
+  --c-fail: #f97066;
+  --c-pass-soft: #0d2a1d;
+  --c-forwarded-soft: #0c2238;
+  --c-misaligned-soft: #2e2106;
+  --c-fail-soft: #34130f;
+
+  --c-series-pass: #1aa864;
+  --c-series-forwarded: #338fe0;
+  --c-series-misaligned: #c0820c;
+  --c-series-fail: #e5405e;
+}
+
+html {
+  font-family: var(--font-sans);
+  background: var(--c-bg);
+  color: var(--c-fg);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+body {
+  background: var(--c-bg);
+  min-height: 100vh;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--c-brand) 25%, transparent);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-line-strong) transparent;
+}
+
+@utility card {
+  @apply rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgba(16,24,40,0.04)];
+}
+@utility card-header {
+  @apply flex items-center justify-between gap-3 border-b border-line px-5 py-3.5;
+}
+@utility card-title {
+  @apply text-sm font-semibold text-fg;
+}
+@utility card-body {
+  @apply p-5;
+}
+@utility label {
+  @apply mb-1.5 block text-xs font-medium text-muted;
+}
+@utility input {
+  @apply w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-fg placeholder:text-faint outline-none transition focus:border-brand focus:ring-3 focus:ring-brand/15 disabled:opacity-60;
+}
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand/30;
+}
+@utility btn-primary {
+  @apply btn bg-brand text-brand-fg shadow-sm hover:brightness-110;
+}
+@utility btn-secondary {
+  @apply btn border border-line-strong bg-surface text-fg hover:bg-subtle;
+}
+@utility btn-ghost {
+  @apply btn text-muted hover:bg-subtle hover:text-fg;
+}
+@utility btn-danger {
+  @apply btn bg-fail text-white hover:brightness-110;
+}
+@utility btn-sm {
+  @apply px-2.5 py-1.5 text-xs;
+}
+@utility table {
+  @apply w-full text-left text-sm;
+  & th {
+    @apply whitespace-nowrap border-b border-line bg-subtle/60 px-4 py-2.5 text-xs font-medium text-muted;
+  }
+  & td {
+    @apply border-b border-line px-4 py-3 align-middle;
+  }
+  & tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  & tbody tr.row-link {
+    @apply cursor-pointer transition hover:bg-subtle/70;
+  }
+}
+@utility mono {
+  @apply font-mono text-[0.8125rem];
+}
