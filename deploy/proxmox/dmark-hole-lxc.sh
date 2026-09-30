@@ -175,22 +175,32 @@ info "Container IP: $CT_IP"
 # --- install ------------------------------------------------------------------------------
 step "Installing DMARK-Hole inside the container"
 SELF="${BASH_SOURCE[0]:-}"
-INSTALL_SRC=""
+REPO_ROOT=""
 if [[ -n "$SELF" && -f "$SELF" ]]; then
-  CAND="$(cd "$(dirname "$SELF")" && pwd)/../install.sh"
-  [[ -f "$CAND" ]] && INSTALL_SRC="$CAND"
+  CAND_ROOT="$(cd "$(dirname "$SELF")/../.." && pwd)"
+  [[ -f "$CAND_ROOT/pnpm-workspace.yaml" && -f "$CAND_ROOT/deploy/install.sh" ]] && REPO_ROOT="$CAND_ROOT"
 fi
-TMP_INSTALL=""
-if [[ -z "$INSTALL_SRC" ]]; then
-  [[ "$REPO_RAW_URL" != *CHANGE_ME* ]] || die "install.sh not found next to this script and REPO_RAW_URL is a placeholder. Set REPO_RAW_URL."
+
+if [[ -n "$REPO_ROOT" ]]; then
+  # Running from a checkout: ship the source into the container, no git hosting needed.
+  info "Packaging local checkout ${REPO_ROOT}"
+  TMP_TAR="$(mktemp --suffix=.tar.gz)"
+  trap 'rm -f "$TMP_TAR"' EXIT
+  tar -C "$REPO_ROOT" --exclude=node_modules --exclude=dist --exclude=data --exclude=.git -czf "$TMP_TAR" .
+  pct exec "$CTID" -- mkdir -p /root/dmark-hole-src
+  pct push "$CTID" "$TMP_TAR" /root/dmark-hole-src.tar.gz
+  pct exec "$CTID" -- tar -xzf /root/dmark-hole-src.tar.gz -C /root/dmark-hole-src
+  pct exec "$CTID" -- rm -f /root/dmark-hole-src.tar.gz
+  pct exec "$CTID" -- bash /root/dmark-hole-src/deploy/install.sh
+else
+  [[ "$REPO_RAW_URL" != *CHANGE_ME* ]] || die "Run this script from a checkout of the repository, or set REPO_URL and REPO_RAW_URL."
   TMP_INSTALL="$(mktemp)"
   trap 'rm -f "$TMP_INSTALL"' EXIT
   info "Fetching ${REPO_RAW_URL}/deploy/install.sh"
   curl -fsSL "${REPO_RAW_URL}/deploy/install.sh" -o "$TMP_INSTALL"
-  INSTALL_SRC="$TMP_INSTALL"
+  pct push "$CTID" "$TMP_INSTALL" /root/install.sh --perms 0755
+  pct exec "$CTID" -- env "REPO_URL=${REPO_URL}" "REPO_BRANCH=${REPO_BRANCH}" bash /root/install.sh
 fi
-pct push "$CTID" "$INSTALL_SRC" /root/install.sh --perms 0755
-pct exec "$CTID" -- env "REPO_URL=${REPO_URL}" "REPO_BRANCH=${REPO_BRANCH}" bash /root/install.sh
 
 CT_IP="$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}' || echo "$CT_IP")"
 PORT=8080

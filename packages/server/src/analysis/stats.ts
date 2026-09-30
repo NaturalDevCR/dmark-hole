@@ -115,28 +115,23 @@ export function timeseries(f: Filter) {
     m[r.category] = r.messages;
     byDay.set(r.day, m);
   }
+  // Compliance counts actual DMARC passes (forwarded mail may pass or fail).
+  const passByDay = new Map(
+    db
+      .all<{ day: string; pass: number; total: number }>(
+        `SELECT r.day, SUM(CASE WHEN r.dmarc_pass = 1 THEN r.count ELSE 0 END) pass, SUM(r.count) total
+         FROM records r WHERE ${w.sql} GROUP BY r.day`,
+        w.params,
+      )
+      .map((r) => [r.day, pct(r.pass, r.total)]),
+  );
   for (const d of days) {
     const m = byDay.get(d) ?? {};
-    const pass = m.pass ?? 0;
-    const fwd = m.forwarded ?? 0;
-    const mis = m.misaligned ?? 0;
-    const fail = m.fail ?? 0;
-    series.pass.push(pass);
-    series.forwarded.push(fwd);
-    series.misaligned.push(mis);
-    series.fail.push(fail);
-    // Forwarded mail may or may not pass DMARC; compliance counts actual DMARC passes.
-    series.compliance.push(null);
-  }
-  const passRows = db.all<{ day: string; pass: number; total: number }>(
-    `SELECT r.day, SUM(CASE WHEN r.dmarc_pass = 1 THEN r.count ELSE 0 END) pass, SUM(r.count) total
-     FROM records r WHERE ${w.sql} GROUP BY r.day`,
-    w.params,
-  );
-  const idx = new Map(days.map((d, i) => [d, i]));
-  for (const r of passRows) {
-    const i = idx.get(r.day);
-    if (i !== undefined) series.compliance[i] = pct(r.pass, r.total);
+    series.pass.push(m.pass ?? 0);
+    series.forwarded.push(m.forwarded ?? 0);
+    series.misaligned.push(m.misaligned ?? 0);
+    series.fail.push(m.fail ?? 0);
+    series.compliance.push(passByDay.get(d) ?? null);
   }
   return { days, series };
 }
