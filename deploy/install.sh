@@ -14,7 +14,7 @@
 #   NODE_MAJOR   Node major to install  (default 24)
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/CHANGE_ME/dmark-hole.git}"
+REPO_URL="${REPO_URL:-https://github.com/NaturalDevCR/dmark-hole.git}"
 REPO_BRANCH="${REPO_BRANCH:-}"
 APP_DIR="${APP_DIR:-/opt/dmark-hole}"
 DATA_DIR="${DATA_DIR:-/var/lib/dmark-hole}"
@@ -50,7 +50,12 @@ export DEBIAN_FRONTEND=noninteractive
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
 # Locate a local checkout (script lives in <repo>/deploy/).
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
+# Empty when piped/fetched (bash -c "$(curl ...)"): then we clone REPO_URL instead.
+SELF="${BASH_SOURCE[0]:-}"
+SCRIPT_DIR=""
+if [[ -n "$SELF" && -f "$SELF" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "$SELF")" 2>/dev/null && pwd || true)"
+fi
 LOCAL_SRC=""
 if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../package.json" && -f "$SCRIPT_DIR/../pnpm-workspace.yaml" ]]; then
   LOCAL_SRC="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -149,7 +154,6 @@ fetch_source() {
     git_update
   else
     [[ $UPDATE -eq 0 ]] || die "--update: ${APP_DIR} is not a git checkout and no local checkout was found."
-    [[ "$REPO_URL" != *CHANGE_ME* ]] || die "Set REPO_URL to your repository (or run this script from a checkout)."
     step "Cloning ${REPO_URL} into ${APP_DIR}"
     [[ ! -e "$APP_DIR" || -z "$(ls -A "$APP_DIR" 2>/dev/null)" ]] || die "${APP_DIR} exists and is not empty."
     git clone --quiet ${REPO_BRANCH:+--branch "$REPO_BRANCH"} "$REPO_URL" "$APP_DIR"

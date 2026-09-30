@@ -4,88 +4,124 @@ Receptor y analizador de reportes DMARC auto-alojado. Un único proceso (Node.js
 
 ## Qué hace
 
-- **Recibe** reportes agregados (**rua**) y forenses (**ruf**) de uno o varios dominios por tres vías: sondeo **IMAP** de un buzón, **receptor SMTP integrado** o **subida manual** de archivos (XML, gz, zip).
+- **Recibe** reportes agregados (**rua**) y forenses (**ruf**) de uno o varios dominios: sondeo **IMAP** de un buzón, **receptor SMTP integrado**, **HTTP con token** o **subida manual** de archivos (XML, gz, zip, eml).
 - **Analiza** cada reporte y **enriquece** las IP de origen con DNS inverso, ASN y país.
 - **Clasifica** el tráfico en cuatro categorías: `pass`, `forwarded` (reenvíos legítimos), `misaligned` (desalineado) y `fail`.
 - **Comprueba el DNS** de cada dominio (DMARC, SPF, DKIM, MTA-STS, TLS-RPT y BIMI) y genera recomendaciones.
 - **Alerta** por webhook o correo electrónico.
 - **Interfaz web moderna** (Vue 3) servida por el mismo proceso, junto con la API bajo `/api`.
 
-Requisitos: Node.js >= 22.13 (usa `node:sqlite`; se recomienda Node 24 LTS). Con Docker o el instalador no hace falta instalar nada a mano.
+## Instalación rápida
 
-## Instalación
-
-### Docker
+**Proxmox (LXC) — un solo comando.** En la shell del host Proxmox, como root:
 
 ```bash
-git clone https://github.com/CHANGE_ME/dmark-hole.git
-cd dmark-hole
-docker compose up -d
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main/deploy/proxmox/dmark-hole-lxc.sh)"
 ```
 
-La interfaz queda en `http://<host>:8080`. En el primer acceso, la página de configuración inicial crea el usuario administrador (o define `ADMIN_EMAIL` / `ADMIN_PASSWORD`).
+Crea un contenedor Debian sin privilegios, instala DMARK-Hole como servicio y al final muestra la URL (`http://<ip-del-contenedor>:8080`). Abra esa URL y cree la cuenta de administrador.
 
-- Los datos (SQLite y secreto generado) viven en el volumen `dmark-data`, montado en `/data`.
-- Personaliza las variables en la sección `environment` de `docker-compose.yml`. El puerto 2525 solo se usa si activas el receptor SMTP.
-
-### Contenedor LXC en Proxmox
-
-Ejecuta esto **en el host Proxmox** como root. Crea un contenedor Debian sin privilegios (nesting activado, inicio automático) e instala la aplicación dentro:
+**Docker:**
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/CHANGE_ME/dmark-hole/main/deploy/proxmox/dmark-hole-lxc.sh)"
+git clone https://github.com/NaturalDevCR/dmark-hole.git && cd dmark-hole && docker compose up -d
 ```
 
-Alternativa (sin publicar el código en GitHub): copia **el repositorio completo** al host y ejecuta el script desde ahí. El script empaqueta el código local, lo sube al contenedor e instala desde esa copia:
+**Debian / Ubuntu (VM, LXC existente o servidor):**
 
 ```bash
-scp -r dmark-hole root@proxmox:/root/
-ssh root@proxmox bash /root/dmark-hole/deploy/proxmox/dmark-hole-lxc.sh
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main/deploy/install.sh)"
 ```
 
-O, si el código está en un repositorio git accesible, copia solo el script y define las URLs:
+Después de instalar: agregue sus dominios, configure cómo llegan los reportes (buzón IMAP, receptor SMTP o HTTP; ver [Cómo recibir los reportes](#cómo-recibir-los-reportes)) y publique el registro DMARC con `rua=` apuntando a esa dirección.
+
+## Instalación detallada
+
+Requisitos: ninguno con Docker o los instaladores. Para ejecutar a mano: Node.js >= 22.13 (usa `node:sqlite`; se recomienda Node 24 LTS) y pnpm 10.
+
+### Proxmox VE (contenedor LXC)
+
+El script se ejecuta **en el host Proxmox** como root:
 
 ```bash
-scp deploy/proxmox/dmark-hole-lxc.sh root@proxmox:/root/
-ssh root@proxmox
-export REPO_URL=https://github.com/CHANGE_ME/dmark-hole.git
-export REPO_RAW_URL=https://raw.githubusercontent.com/CHANGE_ME/dmark-hole/main
-bash /root/dmark-hole-lxc.sh
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main/deploy/proxmox/dmark-hole-lxc.sh)"
 ```
 
-El script pregunta los valores con opciones por defecto. Para uso desatendido, pásalos como variables de entorno (y `NONINTERACTIVE=1`):
+Qué hace, paso a paso:
+
+1. Verifica que es un host Proxmox (`pct`, `pveam`).
+2. Pregunta ID, nombre, almacenamiento, bridge, CPU/RAM/disco e IP (Enter acepta el valor por defecto).
+3. Descarga la plantilla Debian (12 por defecto) si no existe.
+4. Crea un contenedor **sin privilegios** con `nesting=1` e inicio automático, y lo arranca.
+5. Dentro del contenedor ejecuta `deploy/install.sh`: instala Node 24, clona este repositorio en `/opt/dmark-hole`, compila y registra el servicio systemd `dmark-hole`.
+6. Imprime la IP y la URL.
+
+Recursos por defecto: 1 CPU, 1 GB de RAM, 4 GB de disco (suficiente para decenas de dominios; aumente el disco si guarda muchos meses de reportes).
+
+Instalación desatendida (sin preguntas), por ejemplo con IP fija:
+
+```bash
+CTID=150 CT_HOSTNAME=dmarc STORAGE=local-lvm BRIDGE=vmbr0 IP=192.168.1.50/24 GATEWAY=192.168.1.1 NONINTERACTIVE=1 \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main/deploy/proxmox/dmark-hole-lxc.sh)"
+```
 
 | Variable | Por defecto | Descripción |
 |---|---|---|
 | `CTID` | siguiente libre | ID del contenedor |
-| `CT_HOSTNAME` (o `HOSTNAME`) | `dmark-hole` | Nombre de host |
+| `CT_HOSTNAME` | `dmark-hole` | Nombre de host |
 | `STORAGE` | `local-lvm` / primero disponible | Almacenamiento del disco |
 | `TEMPLATE_STORAGE` | `local` | Almacenamiento de plantillas |
-| `BRIDGE` | `vmbr0` | Bridge de red |
+| `BRIDGE` / `VLAN` | `vmbr0` / ninguna | Red |
 | `CORES` / `RAM` / `DISK` | `1` / `1024` (MB) / `4` (GB) | Recursos |
-| `IP` / `GATEWAY` | `dhcp` | IP en formato CIDR y puerta de enlace si es estática |
+| `IP` / `GATEWAY` / `DNS` | `dhcp` | IP en formato CIDR y puerta de enlace si es estática |
 | `DEBIAN_VERSION` | `12` | `12` o `13` |
-| `REPO_URL` / `REPO_RAW_URL` | placeholder | Repositorio git y URL raw de GitHub |
+| `REPO_URL` / `REPO_BRANCH` | este repositorio / `main` | Para instalar desde un fork o una rama |
 
-Al terminar imprime la IP y la URL (`http://<ip>:8080`).
-
-### Debian / Ubuntu (manual)
-
-En un LXC o una VM con Debian 12/13 o Ubuntu 22.04/24.04, como root:
+¿Sin acceso a GitHub desde el contenedor? Copie el repositorio completo al host y ejecute el script desde ahí; empaqueta el código local y lo sube al contenedor:
 
 ```bash
-git clone https://github.com/CHANGE_ME/dmark-hole.git
+scp -r dmark-hole root@proxmox:/root/
+ssh -t root@proxmox bash /root/dmark-hole/deploy/proxmox/dmark-hole-lxc.sh
+```
+
+Para recibir reportes por el **receptor SMTP** en el LXC, redirija el puerto 25 del router/firewall a la IP del contenedor y defina `SMTP_PORT=25` en `/etc/dmark-hole/dmark-hole.env` (ver más abajo).
+
+### Docker
+
+```bash
+git clone https://github.com/NaturalDevCR/dmark-hole.git
+cd dmark-hole
+docker compose up -d
+```
+
+La interfaz queda en `http://<host>:8080`. En el primer acceso, la página de configuración inicial crea el usuario administrador (o defina `ADMIN_EMAIL` / `ADMIN_PASSWORD`).
+
+- Los datos (SQLite y secreto generado) viven en el volumen `dmark-data`, montado en `/data`.
+- Personalice las variables en la sección `environment` de `docker-compose.yml`. El puerto 2525 solo se usa si activa el receptor SMTP.
+
+### Debian / Ubuntu (systemd)
+
+En una VM, LXC o servidor con Debian 12/13 o Ubuntu 22.04/24.04, como root:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main/deploy/install.sh)"
+```
+
+o desde una copia del repositorio:
+
+```bash
+git clone https://github.com/NaturalDevCR/dmark-hole.git
 cd dmark-hole
 ./deploy/install.sh
 ```
 
-Si no lo ejecutas desde un checkout, define `REPO_URL` y el script clona el repositorio por ti. El instalador es idempotente y:
+El instalador es idempotente y:
 
-1. instala Node 24 (NodeSource), habilita corepack/pnpm;
+1. instala Node 24 (NodeSource) y habilita corepack/pnpm;
 2. crea el usuario de sistema `dmark`;
 3. instala la aplicación en `/opt/dmark-hole` y la compila (`pnpm install` + `pnpm build`);
 4. crea `/etc/dmark-hole/dmark-hole.env` (con `DATA_DIR=/var/lib/dmark-hole`);
-5. instala y arranca el servicio systemd `dmark-hole`.
+5. instala y arranca el servicio systemd `dmark-hole` y comprueba `/api/health`.
 
 Comandos útiles:
 
@@ -95,7 +131,7 @@ journalctl -u dmark-hole -f
 systemctl restart dmark-hole   # tras editar /etc/dmark-hole/dmark-hole.env
 ```
 
-La unidad systemd tiene hardening (`ProtectSystem=strict`, `NoNewPrivileges`, etc.) y concede `CAP_NET_BIND_SERVICE`, de modo que puedes usar `SMTP_PORT=25` directamente.
+La unidad systemd tiene hardening (`ProtectSystem=strict`, `NoNewPrivileges`, etc.) y concede `CAP_NET_BIND_SERVICE`, de modo que puede usar `SMTP_PORT=25` directamente.
 
 ## Actualización
 
@@ -104,7 +140,7 @@ La unidad systemd tiene hardening (`ProtectSystem=strict`, `NoNewPrivileges`, et
 | Docker | `git pull && docker compose up -d --build` |
 | LXC / systemd | `/opt/dmark-hole/deploy/install.sh --update` (dentro del contenedor) |
 | LXC desde el host | `pct exec <CTID> -- /opt/dmark-hole/deploy/install.sh --update` |
-| LXC sin repositorio git | Copia la nueva versión al contenedor (`pct push` de un `.tar.gz` o `scp`), descomprímela y ejecuta `./deploy/install.sh --update` desde esa carpeta: sincroniza el código a `/opt/dmark-hole`, recompila y reinicia |
+| LXC sin acceso a GitHub | Copie la nueva versión al contenedor (`pct push` de un `.tar.gz` o `scp`), descomprímala y ejecute `./deploy/install.sh --update` desde esa carpeta |
 
 `--update` hace `git pull` (o sincroniza el checkout local), reconstruye y reinicia el servicio. La configuración y los datos no se tocan. Haz una copia de seguridad antes de actualizar (ver más abajo).
 

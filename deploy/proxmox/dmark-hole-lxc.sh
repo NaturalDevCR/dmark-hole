@@ -2,7 +2,7 @@
 # DMARK-Hole - create an LXC container on a Proxmox VE host and install the app.
 # Run this ON THE PROXMOX HOST, as root:
 #
-#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/CHANGE_ME/dmark-hole/main/deploy/proxmox/dmark-hole-lxc.sh)"
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main/deploy/proxmox/dmark-hole-lxc.sh)"
 #
 # Every setting can be preset through environment variables (skips its prompt),
 # e.g. for unattended use:
@@ -25,9 +25,9 @@
 #   NONINTERACTIVE=1  never prompt, use defaults/env
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/CHANGE_ME/dmark-hole.git}"
+REPO_URL="${REPO_URL:-https://github.com/NaturalDevCR/dmark-hole.git}"
 REPO_BRANCH="${REPO_BRANCH:-}"
-REPO_RAW_URL="${REPO_RAW_URL:-https://raw.githubusercontent.com/CHANGE_ME/dmark-hole/main}"
+REPO_RAW_URL="${REPO_RAW_URL:-https://raw.githubusercontent.com/NaturalDevCR/dmark-hole/main}"
 
 # --- output helpers ------------------------------------------------------------
 if [[ -t 1 ]]; then
@@ -53,7 +53,12 @@ ask() {
   local var="$1" prompt="$2" def="$3" reply
   if [[ -n "${!var:-}" ]]; then return 0; fi
   if [[ $INTERACTIVE -eq 1 ]]; then
-    read -r -p "${prompt} [${def}]: " reply || true
+    # Read from the terminal even when the script itself arrives on stdin (curl | bash).
+    if [[ -r /dev/tty ]]; then
+      read -r -p "${prompt} [${def}]: " reply < /dev/tty || true
+    else
+      read -r -p "${prompt} [${def}]: " reply || true
+    fi
     printf -v "$var" '%s' "${reply:-$def}"
   else
     printf -v "$var" '%s' "$def"
@@ -193,7 +198,6 @@ if [[ -n "$REPO_ROOT" ]]; then
   pct exec "$CTID" -- rm -f /root/dmark-hole-src.tar.gz
   pct exec "$CTID" -- bash /root/dmark-hole-src/deploy/install.sh
 else
-  [[ "$REPO_RAW_URL" != *CHANGE_ME* ]] || die "Run this script from a checkout of the repository, or set REPO_URL and REPO_RAW_URL."
   TMP_INSTALL="$(mktemp)"
   trap 'rm -f "$TMP_INSTALL"' EXIT
   info "Fetching ${REPO_RAW_URL}/deploy/install.sh"
